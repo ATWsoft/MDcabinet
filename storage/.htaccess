@@ -1,0 +1,7 @@
+# Uploady servujeme cez PHP (kvôli oprávneniam), priamy prístup je zakázaný.
+Require all denied
+
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

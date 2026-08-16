@@ -1,0 +1,291 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Základ
+--------------------------------------------------------------------------- */
+@layer base {
+  :root {
+    --mdc-surface: 255 255 255;
+    --mdc-surface-muted: 246 247 249;
+    --mdc-border: 212 217 226;
+    --mdc-text: 31 36 48;
+    --mdc-text-muted: 98 113 140;
+  }
+
+  .dark {
+    --mdc-surface: 31 36 48;
+    --mdc-surface-muted: 20 23 31;
+    --mdc-border: 63 73 93;
+    --mdc-text: 236 238 242;
+    --mdc-text-muted: 174 183 200;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900 antialiased dark:bg-ink-950 dark:text-ink-100;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* Fokus je vidieť len pri ovládaní klávesnicou. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent-500 ring-offset-1 ring-offset-white dark:ring-offset-ink-950;
+  }
+
+  ::selection {
+    @apply bg-accent-200 text-ink-900 dark:bg-accent-700 dark:text-white;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollbary – decentné, aby nekradli pozornosť od textu
+--------------------------------------------------------------------------- */
+@layer utilities {
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--mdc-border)) transparent;
+  }
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--mdc-border));
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--mdc-text-muted));
+    background-clip: content-box;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Vyrenderovaný Markdown
+--------------------------------------------------------------------------- */
+@layer components {
+  .markdown-body {
+    @apply text-[15.5px] leading-7 text-ink-800 dark:text-ink-100;
+  }
+
+  .markdown-body > *:first-child {
+    margin-top: 0;
+  }
+
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    @apply relative scroll-mt-24 font-semibold text-ink-900 dark:text-white;
+  }
+
+  .markdown-body h1 {
+    @apply mb-4 mt-10 text-[1.9rem] leading-tight tracking-tight;
+  }
+  .markdown-body h2 {
+    @apply mb-3 mt-9 border-b border-ink-200 pb-2 text-[1.45rem] leading-snug dark:border-ink-700;
+  }
+  .markdown-body h3 {
+    @apply mb-2 mt-7 text-[1.2rem];
+  }
+  .markdown-body h4 {
+    @apply mb-2 mt-6 text-[1.05rem];
+  }
+  .markdown-body h5,
+  .markdown-body h6 {
+    @apply mb-2 mt-5 text-[0.95rem] uppercase tracking-wide text-ink-500 dark:text-ink-300;
+  }
+
+  .markdown-body .heading-anchor {
+    @apply ml-2 select-none text-ink-300 opacity-0 transition-opacity dark:text-ink-600;
+  }
+  .markdown-body h1:hover .heading-anchor,
+  .markdown-body h2:hover .heading-anchor,
+  .markdown-body h3:hover .heading-anchor,
+  .markdown-body h4:hover .heading-anchor {
+    @apply opacity-100;
+  }
+
+  .markdown-body p {
+    @apply my-4;
+  }
+
+  .markdown-body a {
+    @apply font-medium text-accent-600 underline decoration-accent-300 underline-offset-2
+           hover:decoration-accent-500 dark:text-accent-300 dark:decoration-accent-700;
+  }
+
+  .markdown-body strong {
+    @apply font-semibold text-ink-900 dark:text-white;
+  }
+
+  .markdown-body ul,
+  .markdown-body ol {
+    @apply my-4 space-y-1.5 pl-6;
+  }
+  .markdown-body ul {
+    @apply list-disc marker:text-ink-400;
+  }
+  .markdown-body ol {
+    @apply list-decimal marker:text-ink-400;
+  }
+  .markdown-body li > ul,
+  .markdown-body li > ol {
+    @apply my-1.5;
+  }
+
+  /* Zoznamy s odškrtávacími políčkami (- [ ] úloha) */
+  .markdown-body ul.contains-task-list {
+    @apply list-none pl-1;
+  }
+  .markdown-body .task-list-item {
+    @apply flex items-start gap-2;
+  }
+  .markdown-body .task-list-item input[type='checkbox'] {
+    @apply mt-1.5 h-4 w-4 shrink-0 rounded border-ink-300 text-accent-600 dark:border-ink-600;
+  }
+
+  .markdown-body blockquote {
+    @apply my-5 border-l-4 border-accent-300 bg-accent-50/60 py-1 pl-5 pr-4 text-ink-700
+           dark:border-accent-700 dark:bg-accent-900/20 dark:text-ink-200;
+  }
+  .markdown-body blockquote p {
+    @apply my-2;
+  }
+
+  .markdown-body code {
+    @apply rounded bg-ink-100 px-1.5 py-0.5 font-mono text-[0.87em] text-ink-800
+           dark:bg-ink-800 dark:text-ink-100;
+  }
+
+  .markdown-body pre {
+    @apply my-5 overflow-x-auto rounded-xl bg-ink-900 p-4 text-[0.86rem] leading-6 dark:bg-ink-950/80
+           ring-1 ring-ink-800 dark:ring-ink-800;
+  }
+  .markdown-body pre code {
+    @apply bg-transparent p-0 text-ink-100 dark:text-ink-100;
+  }
+
+  .markdown-body hr {
+    @apply my-8 border-ink-200 dark:border-ink-700;
+  }
+
+  .markdown-body table {
+    @apply my-5 block w-full overflow-x-auto border-collapse text-[0.92rem] md:table;
+  }
+  .markdown-body th,
+  .markdown-body td {
+    @apply border border-ink-200 px-3 py-2 text-left dark:border-ink-700;
+  }
+  .markdown-body th {
+    @apply bg-ink-100 font-semibold dark:bg-ink-800;
+  }
+  .markdown-body tbody tr:nth-child(even) {
+    @apply bg-ink-50/70 dark:bg-ink-900/40;
+  }
+
+  .markdown-body img {
+    @apply my-4 max-w-full rounded-lg ring-1 ring-ink-200 dark:ring-ink-700;
+  }
+
+  .markdown-body kbd {
+    @apply rounded border border-ink-300 bg-ink-50 px-1.5 py-0.5 font-mono text-[0.8em]
+           shadow-sm dark:border-ink-600 dark:bg-ink-800;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Zvýrazňovanie kódu (highlight.js) – vlastná paleta, aby ladila s appkou
+--------------------------------------------------------------------------- */
+.hljs-comment,
+.hljs-quote {
+  @apply italic text-ink-400;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-type,
+.hljs-name,
+.hljs-strong {
+  @apply text-[#c792ea];
+}
+.hljs-string,
+.hljs-title,
+.hljs-attr,
+.hljs-attribute,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  @apply text-[#a5d6a7];
+}
+.hljs-number,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-regexp,
+.hljs-link,
+.hljs-deletion {
+  @apply text-[#ffcb6b];
+}
+.hljs-built_in,
+.hljs-class .hljs-title,
+.hljs-function .hljs-title,
+.hljs-meta {
+  @apply text-[#82aaff];
+}
+
+/* ---------------------------------------------------------------------------
+   CodeMirror – zladenie s dizajnom appky
+--------------------------------------------------------------------------- */
+.cm-editor {
+  @apply h-full text-[15px];
+}
+.cm-editor.cm-focused {
+  outline: none !important;
+}
+.cm-scroller {
+  @apply scrollbar-slim font-mono leading-7;
+  font-family: theme('fontFamily.mono') !important;
+}
+.cm-gutters {
+  @apply border-none bg-transparent text-ink-300 dark:text-ink-600;
+}
+.cm-activeLine {
+  @apply bg-accent-50/50 dark:bg-white/[0.03];
+}
+.cm-activeLineGutter {
+  @apply bg-transparent text-ink-500 dark:text-ink-400;
+}
+.cm-content {
+  @apply py-4;
+  caret-color: rgb(99 102 241);
+}
+.cm-selectionBackground,
+.cm-editor ::selection {
+  @apply bg-accent-200/70 dark:bg-accent-700/50 !important;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .markdown-body {
+    @apply text-black;
+  }
+}

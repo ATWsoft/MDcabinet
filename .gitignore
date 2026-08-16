@@ -1,0 +1,28 @@
+# --- PHP / app ---
+/config/config.php
+/storage/uploads/*
+!/storage/uploads/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/cache/*
+!/storage/cache/.gitkeep
+/vendor/
+
+# --- built frontend (buildne sa lokálne cez `npm run build`) ---
+/assets/
+
+# --- frontend zdroje ---
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+
+# --- deploy ---
+/deploy/
+*.zip

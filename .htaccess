@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+#  MDcabinet – hlavný .htaccess (webroot = koreň projektu)
+# ---------------------------------------------------------------------------
+
+# --- bezpečnosť: neukazuj listing adresárov ---
+Options -Indexes
+
+# --- zablokuj prístup k citlivým adresárom a súborom ---
+RewriteEngine On
+
+RewriteRule ^(app|config|database|frontend|docs|docker|bin)/ - [F,L]
+RewriteRule ^storage/(logs|cache)/ - [F,L]
+RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|\.env.*|.*\.md)$ - [F,L]
+
+# --- existujúce súbory a adresáre servuj priamo (assets, uploady) ---
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# --- všetko ostatné do front controllera ---
+RewriteRule ^ index.php [L]
+
+# --- PHP nastavenia (ak to hosting dovolí) ---
+<IfModule mod_php.c>
+    php_value upload_max_filesize 16M
+    php_value post_max_size 20M
+</IfModule>
+
+# --- kompresia ---
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
+# --- cache pre buildnuté assety (majú hash v názve) ---
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js|css|woff2?|svg|png|jpg|jpeg|webp)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>

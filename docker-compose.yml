@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------------------
+#  Lokálny vývoj – simuluje klasický PHP hosting (Apache + mod_rewrite + MySQL)
+#  Spustenie:  docker compose up -d
+#  App:        http://localhost:8080
+#  Adminer:    http://localhost:8081   (server: db, user: mdcabinet, heslo: secret)
+# ---------------------------------------------------------------------------
+services:
+  app:
+    build: ./docker/php
+    container_name: mdcabinet-app
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www/html
+    environment:
+      MDC_DB_HOST: db
+      MDC_DB_PORT: "3306"
+      MDC_DB_NAME: mdcabinet
+      MDC_DB_USER: mdcabinet
+      MDC_DB_PASS: secret
+      MDC_APP_ENV: local
+      MDC_APP_DEBUG: "1"
+      MDC_APP_URL: http://localhost:8080
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:11
+    container_name: mdcabinet-db
+    ports:
+      - "3307:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: mdcabinet
+      MARIADB_USER: mdcabinet
+      MARIADB_PASSWORD: secret
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  adminer:
+    image: adminer:latest
+    container_name: mdcabinet-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+
+volumes:
+  dbdata:
