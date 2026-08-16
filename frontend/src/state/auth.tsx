@@ -8,7 +8,7 @@ interface AuthContextValue {
   instance: Instance | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, name: string, password: string) => Promise<void>
+  register: (email: string, name: string, password: string, registrationCode?: string) => Promise<void>
   logout: () => Promise<void>
   refresh: () => Promise<void>
 }
@@ -44,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const register = useCallback(
-    async (email: string, name: string, password: string) => {
-      const result = await api.auth.register(email, name, password)
+    async (email: string, name: string, password: string, registrationCode?: string) => {
+      const result = await api.auth.register(email, name, password, registrationCode)
       setCsrfToken(result.csrf)
       await queryClient.invalidateQueries()
       await refetch()

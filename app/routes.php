@@ -12,6 +12,7 @@ declare(strict_types=1);
  */
 
 use MDcabinet\Core\Router;
+use MDcabinet\Http\Controllers\AdminController;
 use MDcabinet\Http\Controllers\AuthController;
 use MDcabinet\Http\Controllers\CabinetController;
 use MDcabinet\Http\Controllers\DocumentController;
@@ -50,6 +51,11 @@ $router->group('/api', [CsrfMiddleware::class], static function (Router $api): v
 
         $r->put('/auth/profile', [AuthController::class, 'updateProfile']);
         $r->put('/auth/password', [AuthController::class, 'changePassword']);
+
+        // Správa inštancie (vnútri si kontroluje rolu admin)
+        $r->get('/admin/settings', [AdminController::class, 'settings']);
+        $r->put('/admin/settings', [AdminController::class, 'updateSettings']);
+        $r->post('/admin/registration-code', [AdminController::class, 'suggestCode']);
 
         // Skrine
         $r->get('/dashboard', [CabinetController::class, 'dashboard']);

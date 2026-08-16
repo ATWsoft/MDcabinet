@@ -19,6 +19,7 @@ export function AuthPage() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
+  const [registrationCode, setRegistrationCode] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -37,7 +38,7 @@ export function AuthPage() {
 
     try {
       if (effectiveMode === 'register') {
-        await register(email, name, password)
+        await register(email, name, password, registrationCode)
       } else {
         await login(email, password)
       }
@@ -110,6 +111,19 @@ export function AuthPage() {
             autoComplete={effectiveMode === 'register' ? 'new-password' : 'current-password'}
             required
           />
+
+          {effectiveMode === 'register' && instance?.requiresRegistrationCode && (
+            <Input
+              label="Registračný kód"
+              value={registrationCode}
+              onChange={(event) => setRegistrationCode(event.target.value)}
+              error={errors.registrationCode}
+              hint="Kód dostaneš od správcu tejto inštancie."
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+          )}
 
           {message && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-700 dark:bg-red-900/30 dark:text-red-300">

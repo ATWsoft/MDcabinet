@@ -7,6 +7,7 @@ namespace MDcabinet\Models;
 use MDcabinet\Core\Config;
 use MDcabinet\Core\Database;
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Request;
 use MDcabinet\Core\Str;
 
 final class Attachment extends Model
@@ -83,10 +84,14 @@ final class Attachment extends Model
         return MDC_STORAGE . '/uploads/' . $diskPath;
     }
 
-    /** URL, ktorá sa vloží do Markdownu. */
+    /**
+     * URL, ktorá sa vloží do Markdownu. Tvar zodpovedá tomu, ako na tento
+     * hosting dorazila požiadavka – vďaka tomu obrázky fungujú aj tam,
+     * kde nie je mod_rewrite.
+     */
     public static function url(int $id): string
     {
-        return Config::basePath() . '/api/files/' . $id;
+        return Request::apiUrl('/files/' . $id);
     }
 
     /**

@@ -6,7 +6,7 @@
  */
 
 import type {
-  Breadcrumb, Cabinet, Doc, DocumentSummary, Folder, Instance,
+  AdminSettings, Breadcrumb, Cabinet, Doc, DocumentSummary, Folder, Instance,
   PublicShare, Revision, SetupStatus, Share, Tray, UploadedFile, User,
 } from './types'
 
@@ -22,7 +22,117 @@ export const bootstrap = window.__MDCABINET__ ?? {
   installed: true,
 }
 
-const API = `${bootstrap.basePath}/api`
+/**
+ * Nie každý hosting má funkčný mod_rewrite. Preto sa pri štarte zistí,
+ * ktorý tvar adries funguje:
+ *
+ *   pekné adresy   /api/auth/me              (rewrite funguje)
+ *   záložné adresy /index.php/api/auth/me    (rewrite nefunguje)
+ *
+ * Podľa výsledku sa zvolí aj typ routera – bez rewritu musí frontend
+ * používať hash routing, inak by priame odkazy na dokumenty končili 404.
+ */
+export type ApiMode = 'pretty' | 'pathinfo' | 'query'
+
+const MODE_KEY = 'mdcabinet.apiMode'
+const MODES: ApiMode[] = ['pretty', 'pathinfo', 'query']
+
+let apiMode: ApiMode = 'pretty'
+
+export function currentApiMode(): ApiMode {
+  return apiMode
+}
+
+export function usesPrettyUrls(): boolean {
+  return apiMode === 'pretty'
+}
+
+/**
+ * Zloží adresu API volania pre aktuálny režim.
+ * `path` je napr. `/search?q=abc`.
+ */
+function buildUrl(path: string, mode: ApiMode = apiMode): string {
+  const base = bootstrap.basePath
+
+  if (mode === 'pretty') return `${base}/api${path}`
+  if (mode === 'pathinfo') return `${base}/index.php/api${path}`
+
+  const [pathname, query] = path.split('?')
+  const params = new URLSearchParams(query ?? '')
+  params.set('_route', `/api${pathname}`)
+
+  return `${base}/index.php?${params.toString()}`
+}
+
+/** Adresa verejného zdieľaného odkazu v tvare, ktorý na tomto hostingu funguje. */
+export function publicShareUrl(token: string): string {
+  const origin = `${window.location.origin}${bootstrap.basePath}`
+
+  // Bez rewritu beží SPA na hash routeri, takže odkaz musí mať mriežku.
+  return apiMode === 'pretty' ? `${origin}/s/${token}` : `${origin}/#/s/${token}`
+}
+
+function applyMode(mode: ApiMode): void {
+  apiMode = mode
+  try {
+    sessionStorage.setItem(MODE_KEY, mode)
+  } catch {
+    /* privátny režim prehliadača – nevadí, zistí sa to znova */
+  }
+}
+
+/** Odpovedá endpoint naším JSON-om (a nie chybovou stránkou hostingu)? */
+async function probe(mode: ApiMode): Promise<boolean> {
+  try {
+    const response = await fetch(buildUrl('/auth/me', mode), {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    })
+    if (!response.ok) return false
+
+    const payload: unknown = await response.json()
+
+    return typeof payload === 'object' && payload !== null && 'csrf' in payload
+  } catch {
+    return false
+  }
+}
+
+/** Už overený režim z predchádzajúceho načítania, ak nejaký je. */
+export function cachedApiMode(): ApiMode | null {
+  try {
+    const cached = sessionStorage.getItem(MODE_KEY)
+
+    return cached && MODES.includes(cached as ApiMode) ? (cached as ApiMode) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Vyskúša režimy v poradí a zapamätá prvý funkčný.
+ *
+ * Appka sa nevykreslí až po tomto teste – štartuje optimisticky s peknými
+ * adresami a detekcia beží na pozadí (viď main.tsx). Na hostingu, kde
+ * rewrite funguje, teda nestojí ani jeden krok navyše.
+ */
+export async function detectApiMode(): Promise<ApiMode> {
+  for (const mode of MODES) {
+    if (await probe(mode)) {
+      applyMode(mode)
+      return mode
+    }
+  }
+
+  // Ani jeden režim neprešiel – necháme pekné adresy a chybu ohlási samotná appka.
+  applyMode('pretty')
+
+  return 'pretty'
+}
+
+export function setApiMode(mode: ApiMode): void {
+  applyMode(mode)
+}
 
 let csrfToken: string | null = null
 
@@ -64,7 +174,7 @@ async function send<T>(method: Method, path: string, body?: unknown, retry = tru
   if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   if (csrfToken && method !== 'GET') headers['X-CSRF-Token'] = csrfToken
 
-  const response = await fetch(`${API}${path}`, {
+  const response = await fetch(buildUrl(path), {
     method,
     headers,
     credentials: 'same-origin',
@@ -115,13 +225,25 @@ export const api = {
     me: () => get<{ user: User | null; csrf: string; instance: Instance }>('/auth/me'),
     login: (email: string, password: string) =>
       post<{ user: User; csrf: string }>('/auth/login', { email, password }),
-    register: (email: string, name: string, password: string) =>
-      post<{ user: User; csrf: string }>('/auth/register', { email, name, password }),
+    register: (email: string, name: string, password: string, registrationCode?: string) =>
+      post<{ user: User; csrf: string }>('/auth/register', {
+        email,
+        name,
+        password,
+        registrationCode: registrationCode || undefined,
+      }),
     logout: () => post<{ ok: boolean }>('/auth/logout'),
     updateProfile: (data: { name: string; avatarColor?: string }) =>
       put<{ user: User }>('/auth/profile', data),
     changePassword: (currentPassword: string, newPassword: string) =>
       put<{ ok: boolean }>('/auth/password', { currentPassword, newPassword }),
+  },
+
+  admin: {
+    settings: () => get<{ settings: AdminSettings }>('/admin/settings'),
+    updateSettings: (data: Partial<Pick<AdminSettings, 'registrationOpen' | 'registrationCode'>>) =>
+      put<{ settings: AdminSettings }>('/admin/settings', data),
+    suggestCode: () => post<{ code: string }>('/admin/registration-code'),
   },
 
   dashboard: () => get<{ cabinets: Cabinet[]; recent: DocumentSummary[] }>('/dashboard'),

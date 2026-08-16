@@ -20,7 +20,8 @@ Cabinet  (skriňa)          → najvyššia úroveň, patrí používateľovi
 - **Fulltextové hľadanie** – `Ctrl/⌘+K`, hľadá v názvoch aj obsahu naprieč skriňami.
 - **Verejné odkazy** – dokument, zložku, šuplík či celú skriňu vieš zdieľať
   read-only odkazom, voliteľne s heslom a expiráciou.
-- **Účty a role** – vlastná registrácia, prvý účet je automaticky správca.
+- **Účty a role** – prvý účet je automaticky správca. Registráciu ďalších sa dá
+  chrániť **registračným kódom** (alebo ju úplne vypnúť), aby si účty nezakladali boti.
 - **Svetlý aj tmavý režim**, plne responzívne, používateľské rozhranie po slovensky.
 
 ## Technológie

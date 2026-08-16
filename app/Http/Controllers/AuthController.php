@@ -12,6 +12,7 @@ use MDcabinet\Core\Request;
 use MDcabinet\Core\Response;
 use MDcabinet\Core\Validator;
 use MDcabinet\Models\Cabinet;
+use MDcabinet\Models\Setting;
 use MDcabinet\Models\Tray;
 use MDcabinet\Models\User;
 
@@ -19,24 +20,47 @@ final class AuthController
 {
     public function register(Request $request): Response
     {
-        if (!Config::get('security.allow_registration', true) && User::count() > 0) {
+        // Úplne prvý účet na inštancii vzniká bez obmedzení – inak by sa
+        // po inštalácii nedalo prihlásiť vôbec nikomu.
+        $firstUser = User::count() === 0;
+
+        if (!$firstUser && !Setting::registrationOpen()) {
             throw HttpException::forbidden('Registrácia je na tejto inštancii vypnutá.');
         }
 
         RateLimiter::hit('register:' . $request->ip(), 10, 3600);
 
         $data = Validator::check($request->all(), [
-            'email'    => 'required|email|max:190',
-            'name'     => 'required|string|min:2|max:120',
-            'password' => 'required|string|min:8|max:200',
+            'email'            => 'required|email|max:190',
+            'name'             => 'required|string|min:2|max:120',
+            'password'         => 'required|string|min:8|max:200',
+            'registrationCode' => 'nullable|string|max:190',
         ]);
+
+        if (!$firstUser && Setting::requiresRegistrationCode()) {
+            // Samostatný limit na hádanie kódu. Úspech ho vynuluje, takže
+            // preklep legitímneho kolegu nikoho nezablokuje – a bot sa
+            // k 12-znakovému kódu aj tak nedostane.
+            RateLimiter::hit('regcode:' . $request->ip(), 10, 3600);
+
+            $supplied = (string) ($data['registrationCode'] ?? '');
+
+            if (!hash_equals(Setting::registrationCode(), $supplied)) {
+                throw HttpException::validation(
+                    ['registrationCode' => 'Registračný kód nesedí.'],
+                    'Na registráciu potrebuješ platný kód od správcu.'
+                );
+            }
+
+            RateLimiter::clear('regcode:' . $request->ip());
+        }
 
         if (User::findByEmail($data['email']) !== null) {
             throw HttpException::validation(['email' => 'Účet s týmto e-mailom už existuje.']);
         }
 
         // Prvý registrovaný používateľ sa stáva správcom inštancie.
-        $role = User::count() === 0 ? 'admin' : 'user';
+        $role = $firstUser ? 'admin' : 'user';
 
         $userId = User::register($data['email'], $data['name'], $data['password'], $role);
         $this->seedWorkspace($userId);
@@ -88,15 +112,18 @@ final class AuthController
     /** Bootstrap stav pre SPA – kto som + CSRF token + nastavenia inštancie. */
     public function me(Request $request): Response
     {
-        $user = Auth::user();
+        $user     = Auth::user();
+        $hasUsers = User::count() > 0;
 
         return Response::json([
             'user'     => $user === null ? null : User::toPublic($user),
             'csrf'     => Auth::csrfToken(),
             'instance' => [
-                'name'               => Config::get('app.name', 'MDcabinet'),
-                'allowRegistration'  => (bool) Config::get('security.allow_registration', true),
-                'hasUsers'           => User::count() > 0,
+                'name'              => Config::get('app.name', 'MDcabinet'),
+                'hasUsers'          => $hasUsers,
+                'allowRegistration' => !$hasUsers || Setting::registrationOpen(),
+                // Samotný kód sa von neposiela, len informácia, že je potrebný.
+                'requiresRegistrationCode' => $hasUsers && Setting::requiresRegistrationCode(),
             ],
         ]);
     }

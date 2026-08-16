@@ -39,8 +39,14 @@ return [
         'session_name'     => 'mdcabinet_session',
         // Dĺžka prihlásenia v sekundách (default 30 dní).
         'session_lifetime' => 60 * 60 * 24 * 30,
+        // Predvoľby registrácie pre čerstvú inštaláciu. Po prvom uložení
+        // v aplikácii (Nastavenia → Registrácia) platia hodnoty z databázy.
+        //
         // Vypni, ak chceš uzavretú inštanciu bez samoregistrácie.
         'allow_registration' => true,
+        // Kód, ktorý musí uchádzač zadať pri registrácii. Prázdne = ktokoľvek
+        // sa môže zaregistrovať (na verejnej doméne to skôr či neskôr nájdu boti).
+        'registration_code'  => '',
     ],
 
     // -------------------------------------------------------------- upload ---

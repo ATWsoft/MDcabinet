@@ -1,29 +1,29 @@
 # ---------------------------------------------------------------------------
 #  MDcabinet – hlavný .htaccess (webroot = koreň projektu)
+#
+#  Všetko je zabalené v <IfModule>, aby jeden chýbajúci modul nezhodil celý
+#  web na 500. Ak hosting nemá mod_rewrite, aplikácia funguje ďalej –
+#  frontend si sám prepne na adresy typu /index.php/api/... (viď docs/DEPLOY.md).
 # ---------------------------------------------------------------------------
 
-# --- bezpečnosť: neukazuj listing adresárov ---
-Options -Indexes
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
 
-# --- zablokuj prístup k citlivým adresárom a súborom ---
-RewriteEngine On
+DirectoryIndex index.php
 
-RewriteRule ^(app|config|database|frontend|docs|docker|bin)/ - [F,L]
-RewriteRule ^storage/(logs|cache)/ - [F,L]
-RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|\.env.*|.*\.md)$ - [F,L]
+<IfModule mod_rewrite.c>
+    RewriteEngine On
 
-# --- existujúce súbory a adresáre servuj priamo (assets, uploady) ---
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
+    # --- citlivé adresáre a súbory ---
+    RewriteRule ^(app|config|database|frontend|docs|docker|bin)/ - [F,L]
+    RewriteRule ^storage/ - [F,L]
+    RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|\.env.*)$ - [F,L]
 
-# --- všetko ostatné do front controllera ---
-RewriteRule ^ index.php [L]
-
-# --- PHP nastavenia (ak to hosting dovolí) ---
-<IfModule mod_php.c>
-    php_value upload_max_filesize 16M
-    php_value post_max_size 20M
+    # --- existujúce súbory a adresáre servuj priamo (assets, favicon) ---
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
 </IfModule>
 
 # --- kompresia ---
@@ -33,7 +33,7 @@ RewriteRule ^ index.php [L]
 
 # --- cache pre buildnuté assety (majú hash v názve) ---
 <IfModule mod_headers.c>
-    <FilesMatch "\.(js|css|woff2?|svg|png|jpg|jpeg|webp)$">
+    <FilesMatch "\.(js|css|woff2?)$">
         Header set Cache-Control "public, max-age=31536000, immutable"
     </FilesMatch>
 </IfModule>

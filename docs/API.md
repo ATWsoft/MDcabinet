@@ -53,14 +53,38 @@ Po dokončení inštalácie sa oba endpointy samy uzamknú.
 
 | Metóda | Cesta | Telo |
 |---|---|---|
-| `POST` | `/api/auth/register` | `email`, `name`, `password` |
+| `POST` | `/api/auth/register` | `email`, `name`, `password`, `registrationCode?` |
 | `POST` | `/api/auth/login` | `email`, `password` |
 | `POST` | `/api/auth/logout` | – |
 | `GET` | `/api/auth/me` | vracia `user`, `csrf`, `instance` |
 | `PUT` | `/api/auth/profile` | `name`, `avatarColor` |
 | `PUT` | `/api/auth/password` | `currentPassword`, `newPassword` |
 
-Prvý registrovaný účet na inštancii dostane rolu `admin`.
+Prvý registrovaný účet na inštancii dostane rolu `admin` a vzniká bez obmedzení.
+
+Ďalšie registrácie sa riadia nastaveniami inštancie:
+
+- registrácia môže byť úplne vypnutá → `403`,
+- môže vyžadovať **registračný kód** → bez neho alebo so zlým `422`
+  s chybou v poli `registrationCode`.
+
+Či je kód potrebný, prezradí `instance.requiresRegistrationCode` v `/api/auth/me`.
+Samotný kód sa neprihlásenému klientovi nikdy neposiela.
+
+Pokusy sú limitované: 10 registrácií a 10 hádaní kódu za hodinu z jednej IP
+(úspešná registrácia počítadlo kódu vynuluje).
+
+## Správa inštancie (len rola `admin`)
+
+| Metóda | Cesta | Popis |
+|---|---|---|
+| `GET` | `/api/admin/settings` | `registrationOpen`, `registrationCode`, `userCount` |
+| `PUT` | `/api/admin/settings` | `registrationOpen?`, `registrationCode?` |
+| `POST` | `/api/admin/registration-code` | vygeneruje návrh kódu (neukladá ho) |
+
+Prázdny `registrationCode` znamená registráciu bez kódu. Neprázdny musí mať
+aspoň 6 znakov. Nastavenia sa držia v tabuľke `settings`, takže sa dajú meniť
+z aplikácie bez zásahu do `config.php`.
 
 ## Prehľad a skrine
 

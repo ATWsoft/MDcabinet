@@ -25,7 +25,7 @@ Vznikne adresár `assets/` v koreni projektu. Node.js na serveri **netreba**.
 
 ## 2. Nahraj súbory
 
-Do webroot (`public_html`, `www`, `httpdocs` – podľa poskytovateľa) nahraj:
+Do webroot (`public_html`, `www`, `htdocs`, `httpdocs` – podľa poskytovateľa) nahraj:
 
 ```
 index.php
@@ -37,6 +37,16 @@ database/
 storage/
 bin/          (voliteľné – len CLI skripty)
 ```
+
+> ⚠️ **Na `.htaccess` sa nezabudni.** Väčšina FTP klientov (FileZilla, WinSCP,
+> Total Commander) skryté súbory začínajúce bodkou **štandardne nezobrazuje**,
+> takže sa ľahko stane, že sa jediný nenahrá. Prejaví sa to tak, že úvodná
+> stránka sa načíta, ale všetko ostatné vracia 404.
+>
+> - **FileZilla**: Server → Vynútiť zobrazovanie skrytých súborov
+> - **WinSCP**: Možnosti → Predvoľby → Panely → Zobrazovať skryté súbory
+>
+> Po nahratí si over, že `.htaccess` je na serveri naozaj vidieť.
 
 Nenahrávaj `frontend/`, `docker/`, `docs/`, `node_modules/` ani `.git/`.
 
@@ -85,10 +95,13 @@ php bin/migrate.php
 
 ## 6. Odporúčania po inštalácii
 
+- **Zapni ochranu registrácie.** Hneď po vytvorení svojho účtu choď do
+  *Nastavenia účtu → Registrácia*, klikni na **Vygenerovať** a ulož.
+  Bez toho si na verejnej doméne skôr či neskôr založia účty boti.
+  Kód potom pošli kolegom – zadajú ho pri registrácii.
+  Registráciu sa dá aj úplne vypnúť; existujúce účty fungujú ďalej.
 - Nastav `config/config.php` na práva `640`.
 - Skontroluj, že `app.debug` je `false` (inštalátor to tak nastaví).
-- Ak nechceš, aby sa registroval hocikto, prepni v configu
-  `security.allow_registration` na `false`. Existujúce účty fungujú ďalej.
 - Nastav `app.url` na plnú adresu, ak appka beží za reverznou proxy –
   inak sa zdieľacie odkazy môžu generovať s nesprávnou doménou.
 
@@ -153,13 +166,49 @@ server {
 }
 ```
 
+## Keď hosting nemá mod_rewrite
+
+Niektoré hostingy (typicky tie zadarmo) `.htaccess` ignorujú alebo nemajú
+zapnutý `mod_rewrite`. MDcabinet s tým počíta – frontend si pri štarte otestuje
+tri tvary adries a použije prvý funkčný:
+
+| Režim | Adresa API | Adresa v prehliadači |
+|---|---|---|
+| `pretty` | `/api/auth/me` | `/documents/5` |
+| `pathinfo` | `/index.php/api/auth/me` | `/#/documents/5` |
+| `query` | `/index.php?_route=/api/auth/me` | `/#/documents/5` |
+
+Bez rewritu teda appka beží na **hash routeri** – v adrese pribudne mriežka,
+inak sa nič nemení. Zdieľacie odkazy aj adresy vložených obrázkov sa
+generujú v rovnakom tvare, takže fungujú tiež.
+
+Zvolený režim si prehliadač pamätá v `sessionStorage` pod kľúčom
+`mdcabinet.apiMode`. Ak si na hostingu neskôr rewrite zapneš, stačí zavrieť
+a znova otvoriť kartu – appka sa pretestuje.
+
+## Diagnostika
+
+Keď niečo nehrá, nahraj vedľa `index.php` súbor `mdcabinet-check.php`
+(je v repozitári) a otvor ho v prehliadači:
+
+```
+https://tvoja-domena.sk/mdcabinet-check.php
+```
+
+Ukáže verziu PHP, rozšírenia, práva na adresáre, či sú nahraté všetky súbory
+a hlavne **otestuje všetky tri režimy smerovania**. Nepotrebuje nič
+z aplikácie, takže funguje aj vtedy, keď je appka rozbitá.
+
+Po vyriešení problému súbor zmaž – vypisuje informácie o serveri.
+
 ## Riešenie problémov
 
 | Prejav | Príčina a riešenie |
 |---|---|
 | Stránka s textom „MDcabinet ešte nemá zbuildovaný frontend“ | Chýba `assets/`. Spusti `npm run build` a nahraj ho. |
 | 500 hneď na úvod | Pozri `storage/logs/app-YYYY-MM-DD.log`. Najčastejšie zlé prístupy k databáze. |
-| Všetko vracia 404 okrem úvodnej stránky | Hosting nemá `mod_rewrite` alebo ignoruje `.htaccess` (`AllowOverride None`). |
+| Inštalátor sa načíta, ale „Kontrola prostredia“ je prázdna a v konzole sú 404 na `/api/...` | Hosting nemá `mod_rewrite`. Nahraj aktuálnu verziu appky – prepne sa na záložný režim sama. Over cez `mdcabinet-check.php`. |
+| Všetko vracia 404 okrem úvodnej stránky | To isté – ignorovaný `.htaccess` alebo `AllowOverride None`. |
 | Inštalátor hlási, že `config/` nie je zapisovateľný | Nastav práva 775, alebo vytvor `config/config.php` ručne podľa `config.example.php`. |
 | Prihlásenie sa hneď stratí | Hosting nemá zapisovateľný adresár pre session, alebo appka beží raz na `www.` a raz bez `www.`. Zjednoť doménu. |
 | Nahrávanie väčších obrázkov zlyhá | Zvýš `upload_max_filesize` a `post_max_size` v PHP a `uploads.max_size` v configu. |

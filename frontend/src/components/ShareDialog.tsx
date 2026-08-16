@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Eye, Link2, Lock, Trash2 } from 'lucide-react'
 
-import { api } from '@/lib/api'
+import { api, publicShareUrl } from '@/lib/api'
 import type { CrumbType } from '@/lib/types'
 import { formatDateTime, timeAgo } from '@/lib/utils'
 import { Button, Input, Modal, Spinner, useToast } from '@/components/ui'
@@ -52,7 +52,7 @@ export function ShareDialog({
       await queryClient.invalidateQueries({ queryKey: key })
       setPassword('')
       setExpiresAt('')
-      void copy(share.url)
+      void copy(publicShareUrl(share.token))
       toast.success('Odkaz vytvorený a skopírovaný do schránky.')
     },
     onError: (error: Error) => toast.error(error.message),
@@ -140,7 +140,7 @@ export function ShareDialog({
                 >
                   <div className="min-w-0 flex-1">
                     <code className="block truncate text-[12.5px] text-ink-600 dark:text-ink-300">
-                      {share.url}
+                      {publicShareUrl(share.token)}
                     </code>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-ink-400">
                       <span className="flex items-center gap-1">
@@ -159,7 +159,7 @@ export function ShareDialog({
                   </div>
 
                   <button
-                    onClick={() => void copy(share.url)}
+                    onClick={() => void copy(publicShareUrl(share.token))}
                     title="Kopírovať odkaz"
                     aria-label="Kopírovať odkaz"
                     className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-white"

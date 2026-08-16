@@ -9,6 +9,14 @@ namespace MDcabinet\Core;
  */
 final class Request
 {
+    /**
+     * Ako sa na tomto hostingu tvoria adresy:
+     *   pretty   – /api/files/12          (funguje mod_rewrite)
+     *   pathinfo – /index.php/api/files/12
+     *   query    – /index.php?_route=/api/files/12
+     */
+    private static string $style = 'pretty';
+
     /** @var array<string,mixed>|null */
     private ?array $json = null;
 
@@ -21,6 +29,26 @@ final class Request
     ) {
     }
 
+    public static function style(): string
+    {
+        return self::$style;
+    }
+
+    /**
+     * Adresa API endpointu v tvare, ktorý na tomto hostingu funguje.
+     * Používa sa napr. pri vkladaní obrázkov do Markdownu.
+     */
+    public static function apiUrl(string $path): string
+    {
+        $base = Config::basePath();
+
+        return match (self::$style) {
+            'pathinfo' => $base . '/index.php/api' . $path,
+            'query'    => $base . '/index.php?_route=' . rawurlencode('/api' . $path),
+            default    => $base . '/api' . $path,
+        };
+    }
+
     public static function capture(): self
     {
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
@@ -30,9 +58,25 @@ final class Request
             $method = strtoupper((string) $_POST['_method']);
         }
 
-        $uri  = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-        $base = Config::basePath();
-        if ($base !== '' && str_starts_with($uri, $base)) {
+        // Cesta môže doraziť tromi spôsobmi – podľa toho, čo hosting zvláda:
+        //   /api/setup/status                       mod_rewrite
+        //   /index.php/api/setup/status             PATH_INFO
+        //   /index.php?_route=/api/setup/status     query parameter
+        if (isset($_GET['_route']) && is_string($_GET['_route']) && $_GET['_route'] !== '') {
+            self::$style = 'query';
+            $path = '/' . trim($_GET['_route'], '/');
+
+            return new self($method, $path === '//' ? '/' : $path);
+        }
+
+        $uri    = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        $script = $_SERVER['SCRIPT_NAME'] ?? '';
+        $base   = Config::basePath();
+
+        if ($script !== '' && $uri !== $script && str_starts_with($uri, $script)) {
+            self::$style = 'pathinfo';
+            $uri = substr($uri, strlen($script));
+        } elseif ($base !== '' && str_starts_with($uri, $base)) {
             $uri = substr($uri, strlen($base));
         }
 

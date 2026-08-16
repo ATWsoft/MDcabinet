@@ -133,6 +133,36 @@ call DELETE "/api/shares/$TOKEN"
 check "DELETE /api/shares/{token}" 200
 
 echo
+echo "── Ochrana registrácie ────────────────────────────────────────────"
+# Nastavenia inštancie vidí len správca. Na už rozbehnutej inštancii je
+# testovací účet bežný používateľ, tak sa táto časť preskočí.
+call GET /api/admin/settings
+if [ "$CODE" = "200" ]; then
+  ORIGINAL_CODE="$(json_get registrationCode)"
+
+  call PUT /api/admin/settings '{"registrationOpen":true,"registrationCode":"TAJNY-KOD-123"}'
+  check "PUT  /api/admin/settings (nastavenie kódu)" 200
+
+  SAVED_JAR="$JAR"; JAR="$(mktemp)"; SAVED_CSRF="$CSRF"; CSRF=""
+
+  call POST /api/auth/register "{\"email\":\"bot+$(date +%s)@mdcabinet.test\",\"name\":\"Bot\",\"password\":\"$PASS\"}"
+  check "registrácia bez kódu je odmietnutá" 422
+
+  call POST /api/auth/register "{\"email\":\"bot2+$(date +%s)@mdcabinet.test\",\"name\":\"Bot\",\"password\":\"$PASS\",\"registrationCode\":\"zly-kod\"}"
+  check "registrácia so zlým kódom je odmietnutá" 422
+
+  call POST /api/auth/register "{\"email\":\"kolega+$(date +%s)@mdcabinet.test\",\"name\":\"Kolega\",\"password\":\"$PASS\",\"registrationCode\":\"TAJNY-KOD-123\"}"
+  check "registrácia so správnym kódom prejde" 201
+
+  rm -f "$JAR"; JAR="$SAVED_JAR"; CSRF="$SAVED_CSRF"
+
+  call PUT /api/admin/settings "{\"registrationOpen\":true,\"registrationCode\":\"$ORIGINAL_CODE\"}"
+  check "obnovenie pôvodného nastavenia" 200
+else
+  printf '  \033[33m•\033[0m %s\n' "preskočené – testovací účet nie je správca"
+fi
+
+echo
 echo "── Bezpečnosť ─────────────────────────────────────────────────────"
 SAVED_CSRF="$CSRF"; CSRF=""
 call POST /api/cabinets '{"name":"Bez CSRF"}'

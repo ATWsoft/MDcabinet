@@ -13,8 +13,16 @@ export interface User {
 
 export interface Instance {
   name: string
-  allowRegistration: boolean
   hasUsers: boolean
+  allowRegistration: boolean
+  /** Registrácia vyžaduje kód od správcu (samotný kód sa cez API neposiela). */
+  requiresRegistrationCode: boolean
+}
+
+export interface AdminSettings {
+  registrationOpen: boolean
+  registrationCode: string
+  userCount: number
 }
 
 export interface Cabinet {
