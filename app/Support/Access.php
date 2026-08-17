@@ -7,14 +7,15 @@ namespace MDcabinet\Support;
 use MDcabinet\Core\Auth;
 use MDcabinet\Core\Database;
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Lang;
 use MDcabinet\Models\Cabinet;
 use MDcabinet\Models\Document;
 use MDcabinet\Models\Folder;
 use MDcabinet\Models\Tray;
 
 /**
- * Jediné miesto, kde sa rozhoduje "smie to tento používateľ vidieť/meniť".
- * Vo v1 platí jednoduché pravidlo: obsah patrí vlastníkovi skrine.
+ * The single place that decides "may this user see or change this".
+ * In v1 the rule is simple: content belongs to the cabinet's owner.
  */
 final class Access
 {
@@ -23,7 +24,7 @@ final class Access
     {
         $cabinet = Cabinet::find($id, $withTrashed);
         if ($cabinet === null) {
-            throw HttpException::notFound('Skriňa neexistuje.');
+            throw HttpException::notFound(Lang::t('The cabinet does not exist.'));
         }
         self::assertOwner((int) $cabinet['owner_id']);
 
@@ -35,7 +36,7 @@ final class Access
     {
         $tray = Tray::find($id, $withTrashed);
         if ($tray === null) {
-            throw HttpException::notFound('Šuplík neexistuje.');
+            throw HttpException::notFound(Lang::t('The tray does not exist.'));
         }
         self::cabinet((int) $tray['cabinet_id'], $withTrashed);
 
@@ -47,7 +48,7 @@ final class Access
     {
         $folder = Folder::find($id, $withTrashed);
         if ($folder === null) {
-            throw HttpException::notFound('Zložka neexistuje.');
+            throw HttpException::notFound(Lang::t('The folder does not exist.'));
         }
         self::tray((int) $folder['tray_id'], $withTrashed);
 
@@ -59,14 +60,14 @@ final class Access
     {
         $document = Document::find($id, $withTrashed);
         if ($document === null) {
-            throw HttpException::notFound('Dokument neexistuje.');
+            throw HttpException::notFound(Lang::t('The document does not exist.'));
         }
         self::tray((int) $document['tray_id'], $withTrashed);
 
         return $document;
     }
 
-    /** Vlastní prihlásený používateľ cieľ zdieľacieho odkazu? */
+    /** Does the signed-in user own the target of a share link? */
     public static function shareTarget(string $type, int $id): void
     {
         match ($type) {
@@ -74,11 +75,11 @@ final class Access
             'tray'     => self::tray($id),
             'folder'   => self::folder($id),
             'document' => self::document($id),
-            default    => throw HttpException::badRequest('Neznámy typ cieľa.'),
+            default    => throw HttpException::badRequest(Lang::t('Unknown target type.')),
         };
     }
 
-    /** Vlastník cieľa zdieľania – používa sa pri verejnom zobrazení. */
+    /** Owner of a share target – used when rendering the public view. */
     public static function ownerOfShareTarget(string $type, int $id): ?int
     {
         $sql = match ($type) {
@@ -107,7 +108,7 @@ final class Access
         $userId = Auth::idOrFail();
 
         if ($ownerId !== $userId && !Auth::isAdmin()) {
-            // Neprezrádzame existenciu cudzieho obsahu.
+            // Do not reveal that someone else's content exists.
             throw HttpException::notFound();
         }
     }

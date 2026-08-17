@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace MDcabinet\Core;
 
 /**
- * Púšťa .sql migrácie z database/migrations v abecednom poradí
- * a eviduje ich v tabuľke `migrations`.
+ * Runs the .sql migrations from database/migrations in alphabetical order
+ * and records them in the `migrations` table.
  */
 final class Migrator
 {
     private const DIR = MDC_ROOT . '/database/migrations';
 
     /**
-     * @return list<string> názvy spustených migrácií
+     * @return list<string> names of the migrations that were applied
      */
     public static function run(): array
     {
@@ -76,8 +76,9 @@ final class Migrator
     }
 
     /**
-     * Rozdelí súbor na jednotlivé príkazy. Migrácie zámerne neobsahujú
-     * procedúry ani triggre, takže stačí delenie podľa bodkočiarky na konci riadku.
+     * Splits a file into individual statements. Migrations deliberately
+     * contain no procedures or triggers, so splitting on a trailing
+     * semicolon is enough.
      *
      * @return list<string>
      */

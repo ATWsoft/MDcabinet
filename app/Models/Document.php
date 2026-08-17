@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace MDcabinet\Models;
 
 use MDcabinet\Core\Database;
+use MDcabinet\Core\Lang;
 use MDcabinet\Core\Str;
 
 final class Document extends Model
 {
     protected const TABLE = 'documents';
 
-    /** Stĺpce bez `content` – pre zoznamy a strom. */
+    /** Columns without `content` – for lists and trees. */
     private const LIST_COLUMNS = 'id, tray_id, folder_id, title, slug, excerpt, word_count,
         is_pinned, position, created_by, updated_by, created_at, updated_at';
 
@@ -52,7 +53,7 @@ final class Document extends Model
     }
 
     /**
-     * Naposledy upravené dokumenty používateľa (dashboard).
+     * The user's most recently edited documents (dashboard).
      *
      * @return list<array<string,mixed>>
      */
@@ -72,7 +73,8 @@ final class Document extends Model
     }
 
     /**
-     * Fulltext hľadanie s LIKE fallbackom (kvôli krátkym slovám a MySQL stopwordom).
+     * Full-text search with a LIKE fallback (MySQL full-text ignores very
+     * short words and stop words).
      *
      * @return list<array<string,mixed>>
      */
@@ -83,8 +85,8 @@ final class Document extends Model
             return [];
         }
 
-        // PDO s vypnutou emuláciou nedovolí ten istý pomenovaný placeholder
-        // použiť viackrát – preto :q_score/:q_match a :like_title/:like_content.
+        // With emulation disabled, PDO does not allow reusing the same named
+        // placeholder, hence :q_score/:q_match and :like_title/:like_content.
         $params = [
             'owner'        => $userId,
             'q_score'      => $query,
@@ -123,7 +125,7 @@ final class Document extends Model
     }
 
     /**
-     * Vytvorenie dokumentu vrátane prvej revízie.
+     * Creates a document together with its first revision.
      *
      * @param array<string,mixed> $data
      */
@@ -138,13 +140,14 @@ final class Document extends Model
             'updated_by' => $userId,
         ]);
 
-        Revision::record($id, $userId, (string) $data['title'], $content, 'create', 'Vytvorenie dokumentu');
+        Revision::record($id, $userId, (string) $data['title'], $content, 'create', Lang::t('Document created'));
 
         return $id;
     }
 
     /**
-     * Uloženie zmeny + nová revízia (ak sa obsah alebo názov naozaj zmenil).
+     * Saves a change and adds a revision, but only when the title or the
+     * content actually changed.
      *
      * @param array<string,mixed> $current
      */
@@ -174,7 +177,7 @@ final class Document extends Model
         return $plain === '' ? 0 : count(preg_split('/\s+/u', $plain) ?: []);
     }
 
-    /** Skriňa, do ktorej dokument patrí (cez šuplík). */
+    /** The cabinet the document belongs to (through its tray). */
     public static function cabinetId(int $documentId): ?int
     {
         $value = Database::scalar(
@@ -188,7 +191,7 @@ final class Document extends Model
     }
 
     /**
-     * Drobečková navigácia pre dokument.
+     * Breadcrumb trail for a document.
      *
      * @return list<array{type:string,id:int,name:string}>
      */

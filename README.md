@@ -22,7 +22,10 @@ Cabinet  (skriňa)          → najvyššia úroveň, patrí používateľovi
   read-only odkazom, voliteľne s heslom a expiráciou.
 - **Účty a role** – prvý účet je automaticky správca. Registráciu ďalších sa dá
   chrániť **registračným kódom** (alebo ju úplne vypnúť), aby si účty nezakladali boti.
-- **Svetlý aj tmavý režim**, plne responzívne, používateľské rozhranie po slovensky.
+- **Dva jazyky** – angličtina (predvolená) a slovenčina. Jazyk sa volí pri registrácii,
+  mení sa v nastaveniach účtu alebo jedným klikom v hlavičke. Prekladá sa aj to,
+  čo posiela server (chybové a validačné hlásenia).
+- **Svetlý aj tmavý režim**, plne responzívne.
 
 ## Technológie
 
@@ -82,6 +85,24 @@ assets/                zbuildovaný frontend (negitovaný, vzniká buildom)
 frontend/              React zdrojáky (na server sa nenahrávajú)
 bin/                   migrate.php, smoke-test.sh
 docs/                  architektúra, API, deploy
+```
+
+## Jazyky
+
+- **Kód aj komentáre sú po anglicky**, dokumentácia v `docs/` po slovensky.
+- UI texty sa neprekladajú kľúčmi, ale priamo anglickým textom (gettext štýl):
+  `t('Save')`. Angličtina je tak zároveň fallback – chýbajúci preklad nikdy
+  nezobrazí prázdny reťazec.
+- Slovenský slovník frontendu: [frontend/src/locales/sk.ts](frontend/src/locales/sk.ts)
+- Slovenský slovník API hlásení: [app/lang/sk.php](app/lang/sk.php)
+
+Pridanie ďalšieho jazyka = doplniť ho do `LOCALES` v `frontend/src/lib/i18n.ts`,
+do `Lang::SUPPORTED` v `app/Core/Lang.php` a pridať dva slovníkové súbory.
+
+Kontrola, či je slovník kompletný (vypíše chýbajúce aj nepoužité kľúče):
+
+```bash
+node bin/check-translations.mjs
 ```
 
 ## Testy

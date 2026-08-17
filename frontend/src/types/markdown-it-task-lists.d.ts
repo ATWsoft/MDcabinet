@@ -1,4 +1,4 @@
-/** Balík nemá vlastné typy ani @types – stačí nám minimálna deklarácia. */
+/** The package ships no types and has no @types – a minimal stub is enough. */
 declare module 'markdown-it-task-lists' {
   import type MarkdownIt from 'markdown-it'
 

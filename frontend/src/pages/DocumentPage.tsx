@@ -6,6 +6,7 @@ import { Check, ChevronRight, History, Pin, Share2, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Breadcrumb } from '@/lib/types'
 import { cx, timeAgo } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 import { Button, ConfirmDialog, EmptyState, PageLoader, useToast } from '@/components/ui'
 import { MarkdownEditor } from '@/components/editor/MarkdownEditor'
 import { RevisionsDrawer } from '@/components/RevisionsDrawer'
@@ -14,6 +15,7 @@ import { ShareDialog } from '@/components/ShareDialog'
 const AUTOSAVE_DELAY = 2000
 
 export function DocumentPage() {
+  const { t } = useI18n()
   const { id } = useParams()
   const documentId = Number(id)
   const navigate = useNavigate()
@@ -38,8 +40,8 @@ export function DocumentPage() {
     enabled: Number.isFinite(documentId),
   })
 
-  // Načítaný dokument nalejeme do lokálneho stavu iba raz – inak by
-  // refetch prepísal rozpísaný text pod rukami.
+  // The loaded document is copied into local state exactly once – otherwise a
+  // refetch would overwrite text the user is still typing.
   useEffect(() => {
     if (!data || loadedId.current === data.document.id) return
 
@@ -62,7 +64,7 @@ export function DocumentPage() {
         current ? { ...current, document: { ...current.document, ...updated } } : current,
       )
     },
-    onError: (error: Error) => toast.error(`Uloženie zlyhalo: ${error.message}`),
+    onError: (error: Error) => toast.error(t('Saving failed: {error}', { error: error.message })),
   })
 
   const saveNow = useCallback(() => {
@@ -72,7 +74,7 @@ export function DocumentPage() {
     save.mutate({ title, content })
   }, [content, dirty, save, title])
 
-  // Autosave – po dvoch sekundách bez písania.
+  // Autosave – two seconds after typing stops.
   useEffect(() => {
     if (!dirty) return
 
@@ -82,11 +84,12 @@ export function DocumentPage() {
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     }
-    // save zámerne nie je v závislostiach: mutácia mení identitu pri každom renderi
+    // `save` is intentionally left out: the mutation object changes identity
+    // on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, title, dirty])
 
-  // Poistka proti zavretiu karty s neuloženým textom.
+  // Safety net against closing the tab with unsaved text.
   useEffect(() => {
     if (!dirty) return
 
@@ -104,7 +107,7 @@ export function DocumentPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.info('Dokument bol zmazaný.')
+      toast.info(t('The document was deleted.'))
       navigate(data ? `/trays/${data.document.trayId}` : '/')
     },
     onError: (error: Error) => toast.error(error.message),
@@ -122,10 +125,15 @@ export function DocumentPage() {
   if (isError || !data) {
     return (
       <div className="p-8">
-        <EmptyState title="Dokument sa nenašiel" description="Možno bol zmazaný alebo patrí inému účtu." />
+        <EmptyState
+          title={t('Document not found')}
+          description={t('It may have been deleted or it belongs to another account.')}
+        />
       </div>
     )
   }
+
+  const pinLabel = data.document.isPinned ? t('Unpin') : t('Pin document')
 
   return (
     <div className="flex h-full flex-col">
@@ -140,9 +148,9 @@ export function DocumentPage() {
               setDirty(true)
             }}
             onBlur={saveNow}
-            aria-label="Názov dokumentu"
+            aria-label={t('Document title')}
             className="min-w-0 flex-1 bg-transparent text-xl font-semibold tracking-tight text-ink-900 outline-none placeholder:text-ink-300 dark:text-white"
-            placeholder="Bez názvu"
+            placeholder={t('Untitled')}
           />
 
           <div className="flex shrink-0 items-center gap-1.5">
@@ -150,8 +158,8 @@ export function DocumentPage() {
               size="sm"
               variant="ghost"
               onClick={() => togglePin.mutate()}
-              aria-label={data.document.isPinned ? 'Zrušiť pripnutie' : 'Pripnúť dokument'}
-              title={data.document.isPinned ? 'Zrušiť pripnutie' : 'Pripnúť dokument'}
+              aria-label={pinLabel}
+              title={pinLabel}
               icon={
                 <Pin
                   className={cx('h-4 w-4', data.document.isPinned && 'fill-current text-accent-600')}
@@ -163,17 +171,17 @@ export function DocumentPage() {
               icon={<History className="h-4 w-4" />}
               onClick={() => setHistoryOpen(true)}
             >
-              História
+              {t('History')}
             </Button>
             <Button size="sm" icon={<Share2 className="h-4 w-4" />} onClick={() => setSharing(true)}>
-              Zdieľať
+              {t('Share')}
             </Button>
             <Button
               size="sm"
               variant="ghost"
               icon={<Trash2 className="h-4 w-4" />}
               onClick={() => setDeleting(true)}
-              aria-label="Zmazať dokument"
+              aria-label={t('Delete document')}
             />
             <Button
               size="sm"
@@ -183,7 +191,7 @@ export function DocumentPage() {
               loading={save.isPending}
               icon={!save.isPending && !dirty ? <Check className="h-4 w-4" /> : undefined}
             >
-              {dirty ? 'Uložiť' : 'Uložené'}
+              {dirty ? t('Save') : t('Saved')}
             </Button>
           </div>
         </div>
@@ -201,12 +209,12 @@ export function DocumentPage() {
         dirty={dirty}
         status={
           save.isPending
-            ? 'Ukladám…'
+            ? t('Saving…')
             : dirty
-              ? 'Neuložené zmeny'
+              ? t('Unsaved changes')
               : savedAt
-                ? `Uložené ${timeAgo(savedAt)}`
-                : 'Uložené'
+                ? t('Saved {when}', { when: timeAgo(savedAt) })
+                : t('Saved')
         }
       />
 
@@ -226,8 +234,8 @@ export function DocumentPage() {
 
       <ConfirmDialog
         open={deleting}
-        title="Zmazať dokument?"
-        description={`„${title}“ zmizne zo šuplíka.`}
+        title={t('Delete this document?')}
+        description={t('“{name}” will disappear from the tray.', { name: title })}
         onCancel={() => setDeleting(false)}
         onConfirm={() => remove.mutate()}
         loading={remove.isPending}

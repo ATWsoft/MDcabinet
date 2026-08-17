@@ -25,7 +25,7 @@ final class CabinetController
         ]);
     }
 
-    /** Dashboard: skrine + naposledy upravené dokumenty. */
+    /** Dashboard: cabinets plus the most recently edited documents. */
     public function dashboard(Request $request): Response
     {
         $userId = Auth::idOrFail();

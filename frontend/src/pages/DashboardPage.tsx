@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { Clock, FileText, Inbox, Library } from 'lucide-react'
 
 import { api } from '@/lib/api'
-import { pluralize, timeAgo } from '@/lib/utils'
+import { timeAgo } from '@/lib/utils'
 import { useAuth } from '@/state/auth'
+import { useI18n } from '@/state/locale'
 import { EmptyState, PageLoader } from '@/components/ui'
 
 export function DashboardPage() {
+  const { t, tn } = useI18n()
   const { user } = useAuth()
 
   const { data, isLoading } = useQuery({
@@ -19,32 +21,36 @@ export function DashboardPage() {
 
   const cabinets = data?.cabinets ?? []
   const recent = data?.recent ?? []
+  const documentCount = cabinets.reduce((total, cabinet) => total + (cabinet.documentCount ?? 0), 0)
+
+  const hour = new Date().getHours()
+  const greeting = hour < 10 ? t('Good morning') : hour < 18 ? t('Good afternoon') : t('Good evening')
 
   return (
     <div className="h-full overflow-y-auto scrollbar-slim">
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8">
         <header className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-white">
-            {greeting()}, {user?.name.split(' ')[0]}.
+            {t('{greeting}, {name}.', { greeting, name: user?.name.split(' ')[0] ?? '' })}
           </h1>
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             {cabinets.length === 0
-              ? 'Začni tým, že si vytvoríš prvú skriňu.'
-              : `${pluralize(cabinets.length, 'skriňa', 'skrine', 'skríň')} · ${pluralize(countDocuments(cabinets), 'dokument', 'dokumenty', 'dokumentov')}`}
+              ? t('Start by creating your first cabinet.')
+              : `${tn(cabinets.length, '{count} cabinet', '{count} cabinets')} · ${tn(documentCount, '{count} document', '{count} documents')}`}
           </p>
         </header>
 
         <section className="mb-10">
           <h2 className="mb-3 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-ink-400">
             <Library className="h-4 w-4" />
-            Skrine
+            {t('Cabinets')}
           </h2>
 
           {cabinets.length === 0 ? (
             <EmptyState
               icon={<Library className="h-10 w-10" />}
-              title="Zatiaľ tu nič nie je"
-              description="Skriňa je najvyššia úroveň. V nej sú šuplíky, v šuplíkoch zložky a v zložkách dokumenty."
+              title={t('Nothing here yet')}
+              description={t('A cabinet is the top level. It holds trays, trays hold folders, folders hold documents.')}
             />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -68,11 +74,11 @@ export function DashboardPage() {
                     </p>
                   )}
                   <div className="mt-3 flex items-center gap-3 text-[12px] text-ink-400">
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1" title={t('Trays')}>
                       <Inbox className="h-3.5 w-3.5" />
                       {cabinet.trayCount ?? 0}
                     </span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1" title={t('Documents')}>
                       <FileText className="h-3.5 w-3.5" />
                       {cabinet.documentCount ?? 0}
                     </span>
@@ -87,7 +93,7 @@ export function DashboardPage() {
           <section>
             <h2 className="mb-3 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-ink-400">
               <Clock className="h-4 w-4" />
-              Naposledy upravené
+              {t('Recently updated')}
             </h2>
 
             <ul className="divide-y divide-ink-100 overflow-hidden rounded-xl bg-white ring-1 ring-ink-200 dark:divide-ink-800 dark:bg-ink-900 dark:ring-ink-800">
@@ -128,16 +134,4 @@ export function DashboardPage() {
       </div>
     </div>
   )
-}
-
-function greeting(): string {
-  const hour = new Date().getHours()
-  if (hour < 10) return 'Dobré ráno'
-  if (hour < 18) return 'Dobrý deň'
-
-  return 'Dobrý večer'
-}
-
-function countDocuments(cabinets: { documentCount?: number }[]): number {
-  return cabinets.reduce((total, cabinet) => total + (cabinet.documentCount ?? 0), 0)
 }

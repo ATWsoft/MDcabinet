@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MDcabinet\Models;
 
 use MDcabinet\Core\Database;
+use MDcabinet\Core\Lang;
 
 final class User extends Model
 {
@@ -26,13 +27,19 @@ final class User extends Model
         return $row === null ? null : self::cast($row);
     }
 
-    public static function register(string $email, string $name, string $password, string $role = 'user'): int
-    {
+    public static function register(
+        string $email,
+        string $name,
+        string $password,
+        string $role = 'user',
+        string $locale = Lang::FALLBACK
+    ): int {
         return self::create([
             'email'         => mb_strtolower(trim($email)),
             'name'          => trim($name),
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'role'          => $role,
+            'locale'        => Lang::isSupported($locale) ? Lang::normalize($locale) : Lang::FALLBACK,
             'avatar_color'  => self::AVATAR_COLORS[array_rand(self::AVATAR_COLORS)],
         ]);
     }
@@ -59,7 +66,7 @@ final class User extends Model
     }
 
     /**
-     * Verzia bez hashu hesla – to, čo sa smie poslať do API.
+     * The version without the password hash – what may be sent through the API.
      *
      * @param array<string,mixed> $user
      * @return array<string,mixed>
@@ -71,6 +78,7 @@ final class User extends Model
             'email'       => $user['email'],
             'name'        => $user['name'],
             'role'        => $user['role'],
+            'locale'      => $user['locale'] ?? Lang::FALLBACK,
             'avatarColor' => $user['avatar_color'] ?? '#6366f1',
             'createdAt'   => $user['created_at'] ?? null,
         ];

@@ -1,4 +1,4 @@
-/** Tvary, ktoré vracia PHP API (app/Support/Presenter.php). */
+/** The shapes returned by the PHP API (see app/Support/Presenter.php). */
 
 export type Role = 'admin' | 'user'
 
@@ -7,6 +7,7 @@ export interface User {
   email: string
   name: string
   role: Role
+  locale: string
   avatarColor: string
   createdAt: string | null
 }
@@ -15,8 +16,10 @@ export interface Instance {
   name: string
   hasUsers: boolean
   allowRegistration: boolean
-  /** Registrácia vyžaduje kód od správcu (samotný kód sa cez API neposiela). */
+  /** Registration needs a code from the administrator (the code is never sent). */
   requiresRegistrationCode: boolean
+  locales: string[]
+  defaultLocale: string
 }
 
 export interface AdminSettings {
@@ -79,7 +82,7 @@ export interface DocumentSummary {
   position: number
   createdAt: string | null
   updatedAt: string | null
-  /** Dopĺňa sa pri hľadaní a v zozname naposledy upravených. */
+  /** Added by search results and the recently updated list. */
   trayName?: string
   cabinetId?: number
   cabinetName?: string

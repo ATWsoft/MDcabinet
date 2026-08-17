@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && a2enmod rewrite headers \
     && rm -rf /var/lib/apt/lists/*
 
-# .htaccess musí byť rešpektovaný (rovnako ako na klasickom hostingu)
+# .htaccess has to be honoured, exactly like on a classic hosting.
 RUN printf '<Directory /var/www/html>\n\tAllowOverride All\n\tRequire all granted\n</Directory>\n' \
         > /etc/apache2/conf-available/mdcabinet.conf \
     && a2enconf mdcabinet

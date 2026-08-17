@@ -8,15 +8,15 @@ use MDcabinet\Core\Database;
 use MDcabinet\Core\Str;
 
 /**
- * Odľahčený "active record light": statické repozitáre nad jednou tabuľkou.
- * Žiadne ORM – dopyty sú viditeľné a predvídateľné.
+ * A lightweight "active record lite": static repositories over a single table.
+ * No ORM – the queries stay visible and predictable.
  */
 abstract class Model
 {
-    /** Názov tabuľky – dopĺňa potomok. */
+    /** Table name – provided by the subclass. */
     protected const TABLE = '';
 
-    /** Stĺpec, podľa ktorého sa robí soft delete (null = tabuľka ho nemá). */
+    /** Soft delete column (null when the table has none). */
     protected const SOFT_DELETE = 'deleted_at';
 
     /** @return array<string,mixed>|null */
@@ -68,7 +68,7 @@ abstract class Model
     }
 
     /**
-     * Ďalšia voľná pozícia v rámci rodiča (pre drag & drop poradie).
+     * The next free position within a parent (used for drag & drop ordering).
      *
      * @param array<string,mixed> $scope
      */
@@ -91,7 +91,8 @@ abstract class Model
     }
 
     /**
-     * Unikátny slug v rámci scope (počíta aj s vymazanými riadkami kvôli unique kľúču).
+     * A slug that is unique within the scope. Soft-deleted rows count too,
+     * because the unique key still covers them.
      *
      * @param array<string,mixed> $scope
      */
@@ -125,7 +126,7 @@ abstract class Model
     }
 
     /**
-     * Pretypuje číselné stĺpce z reťazcov (PDO ich pri niektorých ovládačoch vracia ako string).
+     * Casts numeric columns from strings (some PDO drivers return them as text).
      *
      * @param array<string,mixed> $row
      * @return array<string,mixed>

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace MDcabinet\Core;
 
 /**
- * Minimalistický router: statické segmenty + `{param}` placeholdery.
- * Handler je [Trieda::class, 'metoda'] alebo callable.
+ * Minimal router: literal segments plus `{param}` placeholders.
+ * A handler is either [Class::class, 'method'] or any callable.
  */
 final class Router
 {
@@ -66,8 +66,8 @@ final class Router
         $full   = $full === '' ? '/' : $full;
         $params = [];
 
-        // Literálne časty escapujeme, {param} nahradíme skupinou. Delimiter je #,
-        // takže lomky v ceste nepotrebujú escapovanie.
+        // Literal parts get quoted, {param} becomes a capture group. The
+        // delimiter is # so slashes in the path need no escaping.
         $segments = preg_split('/(\{[a-zA-Z_][a-zA-Z0-9_]*\})/', $full, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [];
         $regex    = '';
         foreach ($segments as $segment) {
@@ -115,19 +115,20 @@ final class Router
             return $this->call($route['handler'], $request);
         }
 
-        // Existuje cesta pod iným HTTP metódou? Potom 405, inak necháme 404 na volajúceho.
+        // Does the path exist under a different HTTP method? Then 405,
+        // otherwise let the caller deal with a 404.
         foreach ($this->routes as $otherMethod => $routes) {
             if ($otherMethod === $method) {
                 continue;
             }
             foreach ($routes as $route) {
                 if (preg_match($route['regex'], $path)) {
-                    throw new HttpException(405, 'Metóda ' . $method . ' tu nie je povolená.');
+                    throw new HttpException(405, Lang::t('Method {method} is not allowed here.', ['method' => $method]));
                 }
             }
         }
 
-        throw HttpException::notFound('Endpoint ' . $path . ' neexistuje.');
+        throw HttpException::notFound(Lang::t('Endpoint {path} does not exist.', ['path' => $path]));
     }
 
     private function call(mixed $handler, Request $request): Response
@@ -139,7 +140,7 @@ final class Router
         } elseif (is_callable($handler)) {
             $result = $handler($request);
         } else {
-            throw new HttpException(500, 'Neplatný route handler.');
+            throw new HttpException(500, Lang::t('Invalid route handler.'));
         }
 
         if ($result instanceof Response) {

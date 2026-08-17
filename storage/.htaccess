@@ -1,4 +1,5 @@
-# Uploady servujeme cez PHP (kvôli oprávneniam), priamy prístup je zakázaný.
+# Uploads are served through PHP (so access can be checked).
+# Direct access is denied.
 Require all denied
 
 <IfModule !mod_authz_core.c>

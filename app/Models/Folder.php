@@ -10,7 +10,7 @@ final class Folder extends Model
 {
     protected const TABLE = 'folders';
 
-    /** Maximálne zanorenie zložiek – poistka proti nekonečnému stromu. */
+    /** Maximum nesting depth – a safeguard against an endless tree. */
     public const MAX_DEPTH = 8;
 
     /**
@@ -40,7 +40,7 @@ final class Folder extends Model
     }
 
     /**
-     * Poskladá plochý zoznam zložiek do stromu a rozdelí k nim dokumenty.
+     * Turns a flat folder list into a tree and attaches the documents.
      *
      * @param list<array<string,mixed>> $folders
      * @param list<array<string,mixed>> $documents
@@ -67,7 +67,7 @@ final class Folder extends Model
         return $branch;
     }
 
-    /** Hĺbka zanorenia (0 = koreňová zložka v šuplíku). */
+    /** Nesting depth (0 = a root folder inside the tray). */
     public static function depth(?int $folderId): int
     {
         $depth = 0;
@@ -83,7 +83,7 @@ final class Folder extends Model
         return $depth;
     }
 
-    /** Je $candidateId potomkom $folderId? Bráni presunu zložky do seba samej. */
+    /** Is $candidateId a descendant of $folderId? Prevents moving a folder into itself. */
     public static function isDescendantOf(int $candidateId, int $folderId): bool
     {
         $current = $candidateId;

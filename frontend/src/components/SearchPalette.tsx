@@ -6,13 +6,15 @@ import { CornerDownLeft, FileText, Search } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import { cx, timeAgo } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 import { Spinner } from '@/components/ui'
 
 /**
- * Rýchle hľadanie (Ctrl/⌘+K). Beží nad fulltextom v MySQL,
- * výsledky sa vyberajú šípkami a otvárajú Enterom.
+ * Quick search (Ctrl/⌘+K). Runs on the MySQL full-text index; results are
+ * picked with the arrow keys and opened with Enter.
  */
 export function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t, tn } = useI18n()
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
   const [active, setActive] = useState(0)
@@ -73,7 +75,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Hľadanie v dokumentoch"
+        aria-label={t('Search documents')}
         className="relative w-full max-w-2xl animate-slide-up overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-ink-200 dark:bg-ink-900 dark:ring-ink-700"
       >
         <div className="flex items-center gap-3 border-b border-ink-100 px-4 dark:border-ink-800">
@@ -83,7 +85,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Hľadaj v dokumentoch…"
+            placeholder={t('Search documents…')}
             className="w-full bg-transparent py-3.5 text-[15px] text-ink-900 outline-none placeholder:text-ink-400 dark:text-white"
           />
           {isFetching && <Spinner className="h-4 w-4" />}
@@ -92,11 +94,11 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
         <div className="max-h-[55vh] overflow-y-auto scrollbar-slim p-2">
           {debounced.length < 2 ? (
             <p className="px-3 py-8 text-center text-sm text-ink-400">
-              Napíš aspoň dva znaky. Hľadá sa v názvoch aj v obsahu dokumentov.
+              {t('Type at least two characters. Titles and document contents are searched.')}
             </p>
           ) : results.length === 0 && !isFetching ? (
             <p className="px-3 py-8 text-center text-sm text-ink-400">
-              Pre „{debounced}“ sa nič nenašlo.
+              {t('Nothing found for “{query}”.', { query: debounced })}
             </p>
           ) : (
             <ul>
@@ -146,8 +148,10 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
         </div>
 
         <div className="flex items-center justify-between border-t border-ink-100 px-4 py-2 text-[11.5px] text-ink-400 dark:border-ink-800">
-          <span>↑↓ výber · Enter otvoriť · Esc zavrieť</span>
-          {results.length > 0 && <span>{results.length} výsledkov</span>}
+          <span>{t('↑↓ to select · Enter to open · Esc to close')}</span>
+          {results.length > 0 && (
+            <span>{tn(results.length, '{count} result', '{count} results')}</span>
+          )}
         </div>
       </div>
     </div>,
@@ -155,7 +159,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
   )
 }
 
-/** Backend obalí nájdený výraz do «…», tu z toho spravíme <mark>. */
+/** The backend wraps the match in «…»; here it becomes a <mark>. */
 function Highlighted({ text }: { text: string }) {
   const parts = text.split(/(«[^»]*»)/g)
 

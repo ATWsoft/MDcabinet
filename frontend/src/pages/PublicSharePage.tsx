@@ -1,19 +1,21 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, FileText, Folder as FolderIcon, Lock } from 'lucide-react'
 
 import { ApiError, api, bootstrap } from '@/lib/api'
 import type { Doc, DocumentSummary, Folder, PublicShare, Tray } from '@/lib/types'
-import { formatDateTime } from '@/lib/utils'
+import { cx, formatDateTime } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 import { Button, EmptyState, Input, PageLoader } from '@/components/ui'
 import { MarkdownPreview } from '@/components/MarkdownPreview'
 
 /**
- * Verejné zobrazenie zdieľaného obsahu. Beží bez prihlásenia,
- * je len na čítanie a vôbec nepoužíva ľavý panel appky.
+ * Public view of shared content. Works without signing in, is read-only and
+ * does not use the app's left panel at all.
  */
 export function PublicSharePage() {
+  const { t } = useI18n()
   const { token = '' } = useParams()
   const [share, setShare] = useState<PublicShare | null>(null)
   const [password, setPassword] = useState('')
@@ -38,7 +40,7 @@ export function PublicSharePage() {
       setUnlockError(
         unlockFailure instanceof ApiError
           ? (unlockFailure.fieldError('password') ?? unlockFailure.message)
-          : 'Odomknutie zlyhalo.',
+          : t('Unlocking failed.'),
       )
     } finally {
       setUnlocking(false)
@@ -51,8 +53,8 @@ export function PublicSharePage() {
     return (
       <PublicShell>
         <EmptyState
-          title="Odkaz nie je dostupný"
-          description={error instanceof Error ? error.message : 'Odkaz neexistuje alebo mu vypršala platnosť.'}
+          title={t('This link is not available')}
+          description={error instanceof Error ? error.message : t('The link does not exist or has expired.')}
         />
       </PublicShell>
     )
@@ -69,8 +71,12 @@ export function PublicSharePage() {
               <Lock className="h-4 w-4" />
             </span>
             <div>
-              <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Obsah je zamknutý</h2>
-              <p className="text-[13px] text-ink-500 dark:text-ink-400">Zadaj heslo, ktoré ti poslali.</p>
+              <h2 className="text-sm font-semibold text-ink-900 dark:text-white">
+                {t('This content is locked')}
+              </h2>
+              <p className="text-[13px] text-ink-500 dark:text-ink-400">
+                {t('Enter the password you were given.')}
+              </p>
             </div>
           </div>
 
@@ -89,7 +95,7 @@ export function PublicSharePage() {
               autoFocus
             />
             <Button type="submit" variant="primary" className="w-full" loading={unlocking}>
-              Odomknúť
+              {t('Unlock')}
             </Button>
           </form>
         </div>
@@ -97,7 +103,7 @@ export function PublicSharePage() {
     )
   }
 
-  // Zdieľaný jeden dokument – zobrazíme ho rovno.
+  // A single shared document is shown right away.
   if (payload.document) {
     return (
       <PublicShell sharedAt={payload.sharedAt}>
@@ -106,7 +112,7 @@ export function PublicSharePage() {
     )
   }
 
-  // Zdieľaný celok – vľavo obsah, vpravo zvolený dokument.
+  // A shared collection: contents on the left, the selected document on the right.
   const tree = payload.cabinet ?? payload.tray ?? payload.folder
 
   return (
@@ -114,7 +120,7 @@ export function PublicSharePage() {
       <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
         <nav className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ink-200 dark:bg-ink-900 dark:ring-ink-800">
           <h2 className="mb-3 truncate text-sm font-semibold text-ink-900 dark:text-white">
-            {tree && 'name' in tree ? tree.name : 'Obsah'}
+            {tree && 'name' in tree ? tree.name : t('Contents')}
           </h2>
           <PublicTree payload={payload} onSelect={setOpenDocument} selected={openDocument} />
         </nav>
@@ -123,8 +129,8 @@ export function PublicSharePage() {
           {openDocument === null ? (
             <EmptyState
               icon={<FileText className="h-9 w-9" />}
-              title="Vyber dokument"
-              description="Vľavo je obsah zdieľanej sekcie."
+              title={t('Pick a document')}
+              description={t('The contents of the shared section are on the left.')}
             />
           ) : (
             <PublicDocument token={token} documentId={openDocument} />
@@ -138,14 +144,16 @@ export function PublicSharePage() {
 function PublicShell({
   children, sharedAt, wide,
 }: {
-  children: React.ReactNode
+  children: ReactNode
   sharedAt?: string
   wide?: boolean
 }) {
+  const { t } = useI18n()
+
   return (
     <div className="min-h-full bg-ink-50 dark:bg-ink-950">
       <header className="border-b border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900">
-        <div className={`mx-auto flex items-center gap-2.5 px-5 py-3 ${wide ? 'max-w-6xl' : 'max-w-3xl'}`}>
+        <div className={cx('mx-auto flex items-center gap-2.5 px-5 py-3', wide ? 'max-w-6xl' : 'max-w-3xl')}>
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent-600 text-white">
             <svg viewBox="0 0 32 32" className="h-4 w-4" aria-hidden>
               <rect x="4" y="6" width="24" height="8" rx="2" fill="currentColor" opacity="0.55" />
@@ -154,13 +162,13 @@ function PublicShell({
           </span>
           <span className="text-sm font-semibold text-ink-900 dark:text-white">{bootstrap.appName}</span>
           <span className="ml-auto rounded-full bg-ink-100 px-2.5 py-1 text-[11.5px] text-ink-500 dark:bg-ink-800 dark:text-ink-400">
-            zdieľané · len na čítanie
+            {t('shared · read only')}
             {sharedAt && ` · ${formatDateTime(sharedAt)}`}
           </span>
         </div>
       </header>
 
-      <main className={`mx-auto px-5 py-8 ${wide ? 'max-w-6xl' : 'max-w-3xl'}`}>{children}</main>
+      <main className={cx('mx-auto px-5 py-8', wide ? 'max-w-6xl' : 'max-w-3xl')}>{children}</main>
     </div>
   )
 }
@@ -177,6 +185,8 @@ function DocumentView({ doc }: { doc: Doc }) {
 }
 
 function PublicDocument({ token, documentId }: { token: string; documentId: number }) {
+  const { t } = useI18n()
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['public', token, 'document', documentId],
     queryFn: () => api.public.document(token, documentId),
@@ -185,7 +195,7 @@ function PublicDocument({ token, documentId }: { token: string; documentId: numb
 
   if (isLoading) return <PageLoader />
   if (isError || !data) {
-    return <EmptyState title="Dokument sa nepodarilo načítať" />
+    return <EmptyState title={t('The document could not be loaded')} />
   }
 
   return <DocumentView doc={data.document} />
@@ -198,17 +208,16 @@ function PublicTree({
   onSelect: (id: number) => void
   selected: number | null
 }) {
+  const { t } = useI18n()
   const trays: Tray[] = payload.cabinet?.trays ?? (payload.tray ? [payload.tray] : [])
   const rootFolder = payload.folder
 
   if (rootFolder) {
-    return (
-      <FolderBranch folder={rootFolder} onSelect={onSelect} selected={selected} depth={0} />
-    )
+    return <FolderBranch folder={rootFolder} onSelect={onSelect} selected={selected} depth={0} />
   }
 
   if (trays.length === 0) {
-    return <p className="text-[13px] text-ink-400">Zdieľaná sekcia je prázdna.</p>
+    return <p className="text-[13px] text-ink-400">{t('The shared section is empty.')}</p>
   }
 
   return (
@@ -284,12 +293,12 @@ function DocumentLink({
     <button
       onClick={() => onSelect(doc.id)}
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
-      className={
-        'flex w-full items-center gap-1.5 rounded-md py-1.5 pr-2 text-left text-[13px] transition-colors ' +
-        (selected === doc.id
+      className={cx(
+        'flex w-full items-center gap-1.5 rounded-md py-1.5 pr-2 text-left text-[13px] transition-colors',
+        selected === doc.id
           ? 'bg-accent-50 font-medium text-accent-700 dark:bg-accent-900/30 dark:text-accent-200'
-          : 'text-ink-600 hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-ink-800')
-      }
+          : 'text-ink-600 hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-ink-800',
+      )}
     >
       <FileText className="h-3.5 w-3.5 shrink-0 text-ink-400" />
       <span className="truncate">{doc.title}</span>

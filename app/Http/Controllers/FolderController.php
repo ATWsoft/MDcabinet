@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MDcabinet\Http\Controllers;
 
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Lang;
 use MDcabinet\Core\Request;
 use MDcabinet\Core\Response;
 use MDcabinet\Core\Validator;
@@ -28,10 +29,10 @@ final class FolderController
         if ($parentId !== null) {
             $parent = Access::folder($parentId);
             if ((int) $parent['tray_id'] !== (int) $tray['id']) {
-                throw HttpException::badRequest('Nadradená zložka patrí do iného šuplíka.');
+                throw HttpException::badRequest(Lang::t('The parent folder belongs to a different tray.'));
             }
             if (Folder::depth($parentId) + 1 >= Folder::MAX_DEPTH) {
-                throw HttpException::badRequest('Zložky sa dajú vnárať maximálne ' . Folder::MAX_DEPTH . ' úrovní.');
+                throw HttpException::badRequest(Lang::t('Folders can be nested at most {depth} levels deep.', ['depth' => Folder::MAX_DEPTH]));
             }
         }
 
@@ -62,7 +63,7 @@ final class FolderController
         return Response::json(['folder' => Presenter::folder(Folder::find((int) $folder['id']) ?? [])]);
     }
 
-    /** Presun zložky pod iného rodiča (alebo do koreňa šuplíka). */
+    /** Moves a folder under a different parent (or to the tray root). */
     public function move(Request $request): Response
     {
         $folder = Access::folder($request->paramInt('id'));
@@ -77,10 +78,10 @@ final class FolderController
             $parent = Access::folder($parentId);
 
             if ((int) $parent['tray_id'] !== (int) $folder['tray_id']) {
-                throw HttpException::badRequest('Presun medzi šuplíkmi zatiaľ nie je podporovaný.');
+                throw HttpException::badRequest(Lang::t('Moving between trays is not supported yet.'));
             }
             if (Folder::isDescendantOf($parentId, (int) $folder['id'])) {
-                throw HttpException::badRequest('Zložku nemôžeš presunúť do seba samej.');
+                throw HttpException::badRequest(Lang::t('A folder cannot be moved into itself.'));
             }
         }
 

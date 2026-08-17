@@ -7,6 +7,7 @@ namespace MDcabinet\Models;
 use MDcabinet\Core\Config;
 use MDcabinet\Core\Database;
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Lang;
 use MDcabinet\Core\Request;
 use MDcabinet\Core\Str;
 
@@ -15,14 +16,14 @@ final class Attachment extends Model
     protected const TABLE = 'attachments';
     protected const SOFT_DELETE = null;
 
-    /** Prípony, ktoré sa nikdy nesmú uložiť, aj keby MIME sedelo. */
+    /** Extensions that are never stored, even if the MIME type looks fine. */
     private const BLOCKED_EXTENSIONS = [
         'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar',
         'htaccess', 'htpasswd', 'cgi', 'pl', 'py', 'sh', 'exe', 'bat', 'com',
     ];
 
     /**
-     * Uloží nahratý súbor na disk a zapíše záznam.
+     * Stores an uploaded file on disk and records it.
      *
      * @param array{name:string,type:string,tmp_name:string,error:int,size:int} $file
      * @return array<string,mixed>
@@ -35,13 +36,16 @@ final class Attachment extends Model
 
         $maxSize = (int) Config::get('uploads.max_size', 16 * 1024 * 1024);
         if ($file['size'] > $maxSize) {
-            throw new HttpException(413, 'Súbor je väčší ako povolených ' . round($maxSize / 1048576) . ' MB.');
+            throw new HttpException(413, Lang::t(
+                'The file is larger than the allowed {size} MB.',
+                ['size' => (int) round($maxSize / 1048576)]
+            ));
         }
 
         $mime = self::detectMime($file['tmp_name'], $file['name']);
         $allowed = (array) Config::get('uploads.mime_allow', []);
         if ($allowed !== [] && !in_array($mime, $allowed, true)) {
-            throw HttpException::badRequest('Typ súboru "' . $mime . '" nie je povolený.');
+            throw HttpException::badRequest(Lang::t('File type "{mime}" is not allowed.', ['mime' => $mime]));
         }
 
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -52,14 +56,14 @@ final class Attachment extends Model
         $relativeDir = date('Y/m');
         $absoluteDir = MDC_STORAGE . '/uploads/' . $relativeDir;
         if (!is_dir($absoluteDir) && !@mkdir($absoluteDir, 0775, true) && !is_dir($absoluteDir)) {
-            throw new HttpException(500, 'Nepodarilo sa vytvoriť adresár pre uploady.');
+            throw new HttpException(500, Lang::t('The upload directory could not be created.'));
         }
 
         $diskName = Str::token(24) . '.' . $extension;
         $diskPath = $relativeDir . '/' . $diskName;
 
         if (!move_uploaded_file($file['tmp_name'], $absoluteDir . '/' . $diskName)) {
-            throw new HttpException(500, 'Súbor sa nepodarilo uložiť.');
+            throw new HttpException(500, Lang::t('The file could not be saved.'));
         }
 
         [$width, $height] = self::imageSize($absoluteDir . '/' . $diskName, $mime);
@@ -85,9 +89,8 @@ final class Attachment extends Model
     }
 
     /**
-     * URL, ktorá sa vloží do Markdownu. Tvar zodpovedá tomu, ako na tento
-     * hosting dorazila požiadavka – vďaka tomu obrázky fungujú aj tam,
-     * kde nie je mod_rewrite.
+     * The URL inserted into Markdown. Its shape matches how the request
+     * reached this hosting, so images also work where mod_rewrite is absent.
      */
     public static function url(int $id): string
     {
@@ -169,11 +172,11 @@ final class Attachment extends Model
     private static function uploadErrorMessage(int $code): string
     {
         return match ($code) {
-            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Súbor je príliš veľký.',
-            UPLOAD_ERR_PARTIAL   => 'Súbor sa nahral len čiastočne.',
-            UPLOAD_ERR_NO_FILE   => 'Nebol poslaný žiadny súbor.',
-            UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE => 'Server nedokáže zapísať dočasný súbor.',
-            default => 'Nahrávanie zlyhalo (kód ' . $code . ').',
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => Lang::t('The file is too large.'),
+            UPLOAD_ERR_PARTIAL   => Lang::t('The file was only partially uploaded.'),
+            UPLOAD_ERR_NO_FILE   => Lang::t('No file was sent.'),
+            UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE => Lang::t('The server cannot write the temporary file.'),
+            default => Lang::t('Upload failed (code {code}).', ['code' => $code]),
         };
     }
 }

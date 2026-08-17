@@ -1,6 +1,6 @@
 -- ---------------------------------------------------------------------------
--- MDcabinet – základná schéma
--- Hierarchia: User → Cabinet → Tray → Folder (rekurzívne) → Document (Markdown)
+-- MDcabinet - initial schema
+-- Hierarchy: User -> Cabinet -> Tray -> Folder (recursive) -> Document (Markdown)
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE `users` (
@@ -18,7 +18,7 @@ CREATE TABLE `users` (
     UNIQUE KEY `uq_users_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Cabinet = najvyššia úroveň, patrí jednému používateľovi.
+-- Cabinet = the top level, owned by a single user.
 CREATE TABLE `cabinets` (
     `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `owner_id`    INT UNSIGNED NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE `cabinets` (
     CONSTRAINT `fk_cabinets_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tray = "šuplík" v skrini.
+-- Tray = a drawer inside the cabinet.
 CREATE TABLE `trays` (
     `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `cabinet_id`  INT UNSIGNED NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE `trays` (
     CONSTRAINT `fk_trays_cabinet` FOREIGN KEY (`cabinet_id`) REFERENCES `cabinets` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Zložky sa môžu vnárať (parent_id), koreňové majú parent_id = NULL.
+-- Folders can nest (parent_id); root folders have parent_id = NULL.
 CREATE TABLE `folders` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `tray_id`    INT UNSIGNED NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE `folders` (
     CONSTRAINT `fk_folders_parent` FOREIGN KEY (`parent_id`) REFERENCES `folders` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Samotný Markdown dokument.
+-- The Markdown document itself.
 CREATE TABLE `documents` (
     `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `tray_id`    INT UNSIGNED NOT NULL,
@@ -100,7 +100,7 @@ CREATE TABLE `documents` (
     CONSTRAINT `fk_documents_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- História: každé uloženie zapíše novú revíziu.
+-- History: every save records a new revision.
 CREATE TABLE `document_revisions` (
     `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `document_id` INT UNSIGNED NOT NULL,
@@ -117,7 +117,7 @@ CREATE TABLE `document_revisions` (
     CONSTRAINT `fk_revisions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Nahraté obrázky a prílohy (fyzicky v storage/uploads, servuje ich PHP).
+-- Uploaded images and attachments (stored in storage/uploads, served by PHP).
 CREATE TABLE `attachments` (
     `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `user_id`       INT UNSIGNED NULL DEFAULT NULL,
@@ -136,7 +136,7 @@ CREATE TABLE `attachments` (
     CONSTRAINT `fk_attachments_document` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Verejné read-only odkazy na cabinet / tray / folder / dokument.
+-- Public read-only links to a cabinet / tray / folder / document.
 CREATE TABLE `share_links` (
     `token`          CHAR(40)     NOT NULL,
     `target_type`    ENUM('cabinet','tray','folder','document') NOT NULL,
@@ -153,7 +153,7 @@ CREATE TABLE `share_links` (
     CONSTRAINT `fk_shares_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Nastavenia inštancie (kľúč/hodnota).
+-- Instance settings (key/value).
 CREATE TABLE `settings` (
     `key`        VARCHAR(100) NOT NULL,
     `value`      TEXT         NULL DEFAULT NULL,

@@ -4,18 +4,13 @@ import { History, RotateCcw, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import { formatDateTime, timeAgo } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 import { Button, ConfirmDialog, PageLoader, useToast } from '@/components/ui'
 import { MarkdownPreview } from '@/components/MarkdownPreview'
 
-const CHANGE_LABELS: Record<string, string> = {
-  create: 'vytvorenie',
-  update: 'úprava',
-  revert: 'návrat',
-}
-
 /**
- * Panel s históriou dokumentu. Kliknutie na revíziu ju ukáže v náhľade,
- * tlačidlom „Obnoviť“ sa dokument vráti do daného stavu (ako nová revízia).
+ * Document history panel. Clicking a revision previews it; "Restore" brings
+ * the document back to that state (as a new revision).
  */
 export function RevisionsDrawer({
   open, onClose, documentId,
@@ -24,10 +19,17 @@ export function RevisionsDrawer({
   onClose: () => void
   documentId: number
 }) {
+  const { t } = useI18n()
   const [selected, setSelected] = useState<number | null>(null)
   const [reverting, setReverting] = useState<number | null>(null)
   const queryClient = useQueryClient()
   const toast = useToast()
+
+  const changeLabels: Record<string, string> = {
+    create: t('created'),
+    update: t('edited'),
+    revert: t('restored'),
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['revisions', documentId],
@@ -46,7 +48,7 @@ export function RevisionsDrawer({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['document', documentId] })
       await queryClient.invalidateQueries({ queryKey: ['revisions', documentId] })
-      toast.success('Dokument je vrátený na zvolenú revíziu.')
+      toast.success(t('The document was restored to the selected revision.'))
       setReverting(null)
       onClose()
     },
@@ -63,17 +65,17 @@ export function RevisionsDrawer({
 
       <aside
         role="dialog"
-        aria-label="História dokumentu"
+        aria-label={t('Document history')}
         className="relative flex h-full w-full max-w-3xl flex-col bg-white shadow-2xl dark:bg-ink-900"
       >
         <header className="flex shrink-0 items-center justify-between border-b border-ink-200 px-5 py-3.5 dark:border-ink-800">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-900 dark:text-white">
             <History className="h-4 w-4 text-ink-400" />
-            História dokumentu
+            {t('Document history')}
           </h2>
           <button
             onClick={onClose}
-            aria-label="Zavrieť"
+            aria-label={t('Close')}
             className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800 dark:hover:text-white"
           >
             <X className="h-4 w-4" />
@@ -83,9 +85,9 @@ export function RevisionsDrawer({
         <div className="flex min-h-0 flex-1">
           <div className="w-72 shrink-0 overflow-y-auto scrollbar-slim border-r border-ink-200 dark:border-ink-800">
             {isLoading ? (
-              <PageLoader label="Načítavam revízie…" />
+              <PageLoader label={t('Loading revisions…')} />
             ) : revisions.length === 0 ? (
-              <p className="p-5 text-sm text-ink-500 dark:text-ink-400">Zatiaľ žiadne revízie.</p>
+              <p className="p-5 text-sm text-ink-500 dark:text-ink-400">{t('No revisions yet.')}</p>
             ) : (
               <ul className="divide-y divide-ink-100 dark:divide-ink-800">
                 {revisions.map((revision) => (
@@ -106,11 +108,12 @@ export function RevisionsDrawer({
                         <span className="text-[11.5px] text-ink-400">{timeAgo(revision.createdAt)}</span>
                       </div>
                       <p className="mt-0.5 truncate text-[12.5px] text-ink-600 dark:text-ink-300">
-                        {revision.summary ?? CHANGE_LABELS[revision.changeType] ?? revision.changeType}
+                        {revision.summary ?? changeLabels[revision.changeType] ?? revision.changeType}
                       </p>
                       <p className="mt-0.5 text-[11.5px] text-ink-400">
-                        {revision.userName ?? 'neznámy autor'}
-                        {revision.contentLength != null && ` · ${revision.contentLength} znakov`}
+                        {revision.userName ?? t('unknown author')}
+                        {revision.contentLength != null &&
+                          ` · ${t('{count} characters', { count: revision.contentLength })}`}
                       </p>
                     </button>
                   </li>
@@ -122,7 +125,7 @@ export function RevisionsDrawer({
           <div className="min-w-0 flex-1 overflow-y-auto scrollbar-slim bg-ink-50/50 p-6 dark:bg-ink-950/30">
             {selected === null ? (
               <p className="mt-10 text-center text-sm text-ink-400">
-                Vyber revíziu vľavo a uvidíš, ako dokument vtedy vyzeral.
+                {t('Pick a revision on the left to see how the document looked then.')}
               </p>
             ) : loadingDetail ? (
               <PageLoader />
@@ -134,14 +137,16 @@ export function RevisionsDrawer({
                       {detail.revision.title}
                     </p>
                     <p className="text-[12px] text-ink-500 dark:text-ink-400">
-                      revízia #{detail.revision.revisionNo} · {formatDateTime(detail.revision.createdAt)}
+                      {t('revision #{number}', { number: detail.revision.revisionNo })}
+                      {' · '}
+                      {formatDateTime(detail.revision.createdAt)}
                     </p>
                   </div>
                   <Button
                     icon={<RotateCcw className="h-4 w-4" />}
                     onClick={() => setReverting(detail.revision.id)}
                   >
-                    Obnoviť túto verziu
+                    {t('Restore this version')}
                   </Button>
                 </div>
 
@@ -154,10 +159,10 @@ export function RevisionsDrawer({
 
       <ConfirmDialog
         open={reverting !== null}
-        title="Obnoviť staršiu verziu?"
-        description="Aktuálny text sa nahradí obsahom vybranej revízie."
-        confirmLabel="Obnoviť"
-        note="História zostane zachovaná – vznikne nová revízia typu „návrat“, takže sa vieš vrátiť aj späť."
+        title={t('Restore an older version?')}
+        description={t('The current text will be replaced by the selected revision.')}
+        confirmLabel={t('Restore')}
+        note={t('The history is preserved – a new “restored” revision is created, so you can go back again.')}
         onCancel={() => setReverting(null)}
         onConfirm={() => reverting !== null && revert.mutate(reverting)}
         loading={revert.isPending}

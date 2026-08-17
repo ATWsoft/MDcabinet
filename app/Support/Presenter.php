@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace MDcabinet\Support;
 
 /**
- * Prevod DB riadkov (snake_case) na tvar, ktorý konzumuje frontend (camelCase).
- * Drží API stabilné aj keď sa schéma zmení.
+ * Converts database rows (snake_case) into the shape the frontend consumes
+ * (camelCase). Keeps the API stable even when the schema changes.
  */
 final class Presenter
 {
@@ -97,7 +97,7 @@ final class Presenter
     }
 
     /**
-     * Dokument bez obsahu – pre stromy, zoznamy a výsledky hľadania.
+     * A document without its content – for trees, lists and search results.
      *
      * @param array<string,mixed> $row
      * @return array<string,mixed>
@@ -118,7 +118,7 @@ final class Presenter
             'updatedAt' => $row['updated_at'] ?? null,
         ];
 
-        // Doplnkový kontext z hľadania / posledne upravených.
+        // Extra context coming from search / recently updated lists.
         foreach (['tray_name' => 'trayName', 'cabinet_id' => 'cabinetId',
                   'cabinet_name' => 'cabinetName', 'cabinet_color' => 'cabinetColor'] as $from => $to) {
             if (isset($row[$from])) {

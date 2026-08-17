@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace MDcabinet\Core;
 
 /**
- * Prihlásenie stojí na natívnej PHP session (SPA beží na rovnakej doméne),
- * takže netreba JWT ani žiadnu ďalšiu závislosť. Proti CSRF chráni
- * SameSite=Lax cookie + token v hlavičke X-CSRF-Token.
+ * Sign-in is built on the native PHP session (the SPA runs on the same
+ * origin), so neither JWT nor any extra dependency is needed. CSRF is covered
+ * by a SameSite=Lax cookie plus a token in the X-CSRF-Token header.
  */
 final class Auth
 {
@@ -101,8 +101,11 @@ final class Auth
             return null;
         }
 
+        // SELECT * on purpose: an explicit column list would make the whole
+        // app fail with a 500 whenever a migration adding a column has not
+        // been applied yet. The hash is dropped right after.
         $user = Database::fetch(
-            'SELECT id, email, name, role, avatar_color, created_at FROM users WHERE id = :id AND deleted_at IS NULL',
+            'SELECT * FROM users WHERE id = :id AND deleted_at IS NULL',
             ['id' => $id]
         );
 
@@ -111,6 +114,7 @@ final class Auth
             return null;
         }
 
+        unset($user['password_hash']);
         $user['id'] = (int) $user['id'];
 
         return self::$user = $user;
@@ -137,7 +141,13 @@ final class Auth
         return (self::user()['role'] ?? '') === 'admin';
     }
 
-    // ------------------------------------------------------------- CSRF ---
+    /** Forgets the cached user so the next read hits the database again. */
+    public static function forgetCachedUser(): void
+    {
+        self::$user = null;
+    }
+
+    // -------------------------------------------------------------- CSRF ---
 
     public static function csrfToken(): string
     {

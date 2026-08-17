@@ -21,7 +21,7 @@ final class Tray extends Model
         ));
     }
 
-    /** Skriňa, do ktorej šuplík patrí – pre kontrolu vlastníctva. */
+    /** The cabinet the tray belongs to – used for ownership checks. */
     public static function cabinetId(int $trayId): ?int
     {
         $value = Database::scalar(

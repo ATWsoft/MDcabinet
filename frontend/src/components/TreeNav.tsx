@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { ChevronRight, FileText, Folder as FolderIcon, FolderOpen, Inbox } from 'lucide-react'
+
 import type { Cabinet, DocumentSummary, Folder, Tray } from '@/lib/types'
 import { cx } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 
 /**
- * Stromová navigácia v ľavom paneli: Cabinet → Tray → Folder → Document.
- * Rozbalenie si pamätá localStorage, aby sa strom po refreshi nezložil.
+ * Tree navigation in the left panel: Cabinet → Tray → Folder → Document.
+ * The expanded state lives in localStorage so the tree survives a reload.
  */
 
 const OPEN_KEY = 'mdcabinet.tree.open'
@@ -51,12 +53,13 @@ interface TreeProps {
 }
 
 export function CabinetTree({ cabinet, open, onToggle }: TreeProps) {
+  const { t } = useI18n()
   const trays = cabinet.trays ?? []
 
   if (trays.length === 0) {
     return (
       <p className="px-3 py-2 text-[13px] italic text-ink-400 dark:text-ink-500">
-        Zatiaľ žiadne šuplíky.
+        {t('No trays yet.')}
       </p>
     )
   }
@@ -71,6 +74,7 @@ export function CabinetTree({ cabinet, open, onToggle }: TreeProps) {
 }
 
 function TrayNode({ tray, open, onToggle }: { tray: Tray; open: Set<string>; onToggle: (key: string) => void }) {
+  const { t } = useI18n()
   const key = `tray-${tray.id}`
   const expanded = open.has(key)
   const isEmpty = (tray.folders?.length ?? 0) === 0 && (tray.documents?.length ?? 0) === 0
@@ -80,7 +84,7 @@ function TrayNode({ tray, open, onToggle }: { tray: Tray; open: Set<string>; onT
       <div className="group flex items-center gap-0.5">
         <button
           onClick={() => onToggle(key)}
-          aria-label={expanded ? 'Zbaliť' : 'Rozbaliť'}
+          aria-label={expanded ? t('Collapse') : t('Expand')}
           aria-expanded={expanded}
           className="rounded p-0.5 text-ink-400 transition-transform hover:text-ink-700 dark:hover:text-ink-200"
         >
@@ -105,7 +109,7 @@ function TrayNode({ tray, open, onToggle }: { tray: Tray; open: Set<string>; onT
       {expanded && (
         <div className="ml-4 border-l border-ink-100 pl-1.5 dark:border-ink-800">
           {isEmpty ? (
-            <p className="px-2 py-1 text-[12.5px] italic text-ink-400 dark:text-ink-500">prázdny</p>
+            <p className="px-2 py-1 text-[12.5px] italic text-ink-400 dark:text-ink-500">{t('empty')}</p>
           ) : (
             <>
               {(tray.folders ?? []).map((folder) => (
@@ -129,6 +133,7 @@ function FolderNode({
   open: Set<string>
   onToggle: (key: string) => void
 }) {
+  const { t } = useI18n()
   const key = `folder-${folder.id}`
   const expanded = open.has(key)
   const children = folder.children ?? []
@@ -162,7 +167,7 @@ function FolderNode({
             <DocumentNode key={doc.id} doc={doc} />
           ))}
           {children.length === 0 && documents.length === 0 && (
-            <p className="px-2 py-1 text-[12.5px] italic text-ink-400 dark:text-ink-500">prázdna</p>
+            <p className="px-2 py-1 text-[12.5px] italic text-ink-400 dark:text-ink-500">{t('empty')}</p>
           )}
         </div>
       )}

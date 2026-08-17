@@ -6,7 +6,7 @@ namespace MDcabinet\Core;
 
 final class Response
 {
-    /** Ak je nastavené, telo sa streamuje zo súboru namiesto $body. */
+    /** When set, the body is streamed from this file instead of $body. */
     private ?string $streamFile = null;
 
     /** @param array<string,string> $headers */
@@ -48,12 +48,12 @@ final class Response
     }
 
     /**
-     * Odošle súbor zo storage (uploady sa nikdy neservujú priamo Apachom).
+     * Sends a file from storage (uploads are never served by Apache directly).
      */
     public static function file(string $absolutePath, string $mime, string $downloadName = '', bool $inline = true): self
     {
         if (!is_file($absolutePath)) {
-            throw HttpException::notFound('Súbor neexistuje.');
+            throw HttpException::notFound(Lang::t('The file does not exist.'));
         }
 
         $disposition = $inline ? 'inline' : 'attachment';

@@ -1,15 +1,15 @@
 <?php
 /**
- * CLI migrácie:  php bin/migrate.php
+ * CLI migrations:  php bin/migrate.php
  *
- * Na hostingoch bez SSH použi radšej webový setup na /setup.
+ * On hostings without SSH use the web installer at /setup instead.
  */
 
 declare(strict_types=1);
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
-    exit('Tento skript sa dá spustiť iba z príkazového riadku.');
+    exit('This script can only be run from the command line.');
 }
 
 require __DIR__ . '/../app/bootstrap.php';
@@ -19,12 +19,12 @@ use MDcabinet\Core\Migrator;
 $pending = Migrator::pending();
 
 if ($pending === []) {
-    echo "Databáza je aktuálna, nič na spustenie.\n";
+    echo "The database is up to date, nothing to run.\n";
     exit(0);
 }
 
-echo "Spúšťam migrácie:\n";
+echo "Running migrations:\n";
 foreach (Migrator::run() as $name) {
-    echo "  ✓ {$name}\n";
+    echo "  + {$name}\n";
 }
-echo "Hotovo.\n";
+echo "Done.\n";

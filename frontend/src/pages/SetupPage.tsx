@@ -1,16 +1,19 @@
-import { useState } from 'react'
+import { useState, type ChangeEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Database, XCircle } from 'lucide-react'
 
 import { ApiError, api } from '@/lib/api'
+import { LOCALES, LOCALE_NAMES } from '@/lib/i18n'
 import { Button, Input, PageLoader, useToast } from '@/components/ui'
+import { useI18n } from '@/state/locale'
 
 /**
- * Webový inštalátor pre hostingy bez SSH. Overí prostredie, otestuje
- * pripojenie k databáze, zapíše config/config.php a spustí migrácie.
+ * Web installer for hostings without SSH. It checks the environment, tests the
+ * database connection, writes config/config.php and runs the migrations.
  */
 export function SetupPage() {
+  const { t, locale, setLocale } = useI18n()
   const navigate = useNavigate()
   const toast = useToast()
 
@@ -26,11 +29,11 @@ export function SetupPage() {
   const [busy, setBusy] = useState(false)
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['setup'],
+    queryKey: ['setup', locale],
     queryFn: () => api.setup.status(),
   })
 
-  if (isLoading) return <PageLoader label="Kontrolujem prostredie…" />
+  if (isLoading) return <PageLoader label={t('Checking the environment…')} />
 
   if (data?.installed) {
     return (
@@ -38,20 +41,20 @@ export function SetupPage() {
         <div className="rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-ink-200 dark:bg-ink-900 dark:ring-ink-800">
           <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-emerald-500" />
           <h2 className="text-base font-semibold text-ink-900 dark:text-white">
-            MDcabinet je už nainštalovaný
+            {t('MDcabinet is already installed')}
           </h2>
           <p className="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
-            Inštalátor je z bezpečnostných dôvodov uzamknutý.
+            {t('The installer is locked for safety.')}
           </p>
           <Button variant="primary" className="mt-5" onClick={() => navigate('/')}>
-            Prejsť do aplikácie
+            {t('Go to the app')}
           </Button>
         </div>
       </Shell>
     )
   }
 
-  const update = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement>) =>
+  const update = (key: keyof typeof form) => (event: ChangeEvent<HTMLInputElement>) =>
     setForm((current) => ({ ...current, [key]: event.target.value }))
 
   const install = async () => {
@@ -66,7 +69,7 @@ export function SetupPage() {
         dbPass: form.dbPass,
         appUrl: form.appUrl || undefined,
       })
-      toast.success(`Hotovo – spustených ${result.migrations.length} migrácií.`)
+      toast.success(t('Done – {count} migrations were applied.', { count: result.migrations.length }))
       await refetch()
       navigate('/login')
     } catch (error) {
@@ -74,7 +77,7 @@ export function SetupPage() {
         setErrors(error.errors)
         if (Object.keys(error.errors).length === 0) toast.error(error.message)
       } else {
-        toast.error('Inštalácia zlyhala.')
+        toast.error(t('The installation failed.'))
       }
     } finally {
       setBusy(false)
@@ -87,9 +90,26 @@ export function SetupPage() {
 
   return (
     <Shell>
+      <div className="mb-5 flex justify-center gap-2">
+        {LOCALES.map((value) => (
+          <button
+            key={value}
+            onClick={() => setLocale(value)}
+            className={
+              'rounded-md px-2.5 py-1 text-[12.5px] transition-colors ' +
+              (value === locale
+                ? 'bg-white font-medium text-accent-700 shadow-sm ring-1 ring-ink-200 dark:bg-ink-800 dark:text-accent-200 dark:ring-ink-700'
+                : 'text-ink-500 hover:text-ink-800 dark:text-ink-400 dark:hover:text-white')
+            }
+          >
+            {LOCALE_NAMES[value]}
+          </button>
+        ))}
+      </div>
+
       <section className="mb-5 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-ink-200 dark:bg-ink-900 dark:ring-ink-800">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-ink-400">
-          Kontrola prostredia
+          {t('Environment check')}
         </h2>
         <ul className="space-y-2">
           {(data?.requirements ?? []).map((requirement) => (
@@ -111,11 +131,10 @@ export function SetupPage() {
       <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-ink-200 dark:bg-ink-900 dark:ring-ink-800">
         <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-ink-400">
           <Database className="h-4 w-4" />
-          Pripojenie k databáze
+          {t('Database connection')}
         </h2>
         <p className="mb-5 text-[13px] text-ink-500 dark:text-ink-400">
-          Údaje nájdeš v administrácii hostingu. Databáza musí už existovať – MDcabinet
-          si v nej sám vytvorí tabuľky.
+          {t('You will find these in your hosting control panel. The database has to exist already – MDcabinet creates the tables itself.')}
         </p>
 
         <form
@@ -127,34 +146,34 @@ export function SetupPage() {
         >
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="sm:col-span-2">
-              <Input label="Server" value={form.dbHost} onChange={update('dbHost')} error={errors.dbHost} />
+              <Input label={t('Server')} value={form.dbHost} onChange={update('dbHost')} error={errors.dbHost} />
             </div>
-            <Input label="Port" value={form.dbPort} onChange={update('dbPort')} error={errors.dbPort} />
+            <Input label={t('Port')} value={form.dbPort} onChange={update('dbPort')} error={errors.dbPort} />
           </div>
 
-          <Input label="Názov databázy" value={form.dbName} onChange={update('dbName')} error={errors.dbName} required />
+          <Input label={t('Database name')} value={form.dbName} onChange={update('dbName')} error={errors.dbName} required />
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Používateľ" value={form.dbUser} onChange={update('dbUser')} error={errors.dbUser} required />
-            <Input label="Heslo" type="password" value={form.dbPass} onChange={update('dbPass')} error={errors.dbPass} />
+            <Input label={t('User')} value={form.dbUser} onChange={update('dbUser')} error={errors.dbUser} required />
+            <Input label={t('Password')} type="password" value={form.dbPass} onChange={update('dbPass')} error={errors.dbPass} />
           </div>
 
           <Input
-            label="Adresa aplikácie (voliteľné)"
+            label={t('Application URL (optional)')}
             value={form.appUrl}
             onChange={update('appUrl')}
             placeholder={data?.suggestedUrl}
-            hint="Nechaj prázdne a odvodí sa automaticky. Vyplň, ak beží za reverznou proxy."
+            hint={t('Leave empty to derive it automatically. Fill it in when running behind a reverse proxy.')}
           />
 
           {blockers.length > 0 && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-              Niektoré požiadavky nie sú splnené – inštalácia môže zlyhať.
+              {t('Some requirements are not met – the installation may fail.')}
             </p>
           )}
 
           <Button type="submit" variant="primary" size="lg" loading={busy} className="w-full">
-            Nainštalovať
+            {t('Install')}
           </Button>
         </form>
       </section>
@@ -162,7 +181,9 @@ export function SetupPage() {
   )
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
+
   return (
     <div className="min-h-full bg-ink-50 px-4 py-12 dark:bg-ink-950">
       <div className="mx-auto max-w-xl">
@@ -174,10 +195,10 @@ function Shell({ children }: { children: React.ReactNode }) {
             </svg>
           </span>
           <h1 className="text-xl font-semibold tracking-tight text-ink-900 dark:text-white">
-            Inštalácia MDcabinetu
+            {t('Install MDcabinet')}
           </h1>
           <p className="mt-1.5 text-sm text-ink-500 dark:text-ink-400">
-            Pár údajov a môžeš začať písať.
+            {t('A few details and you can start writing.')}
           </p>
         </header>
         {children}

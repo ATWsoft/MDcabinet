@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace MDcabinet\Core;
 
 /**
- * Textové pomôcky. Slugify beží bez `intl` – hosting ho často nemá.
+ * Text helpers. Slugify works without the `intl` extension, which shared
+ * hosting often does not provide.
  */
 final class Str
 {
@@ -39,27 +40,27 @@ final class Str
         return $value !== '' ? $value : $fallback . '-' . substr(bin2hex(random_bytes(4)), 0, 6);
     }
 
-    /** Náhodný URL-safe token (dĺžka v znakoch, párna). */
+    /** Random URL-safe token; length is in characters and should be even. */
     public static function token(int $length = 32): string
     {
         return substr(bin2hex(random_bytes((int) ceil($length / 2))), 0, $length);
     }
 
     /**
-     * Krátky náhľad z Markdownu – odstráni najbežnejšiu MD syntax.
+     * Short plain-text preview of Markdown, with the most common syntax removed.
      */
     public static function excerpt(string $markdown, int $length = 300): string
     {
         $text = $markdown;
         $text = preg_replace('/^---\R.*?\R---\R/su', '', $text) ?? $text;   // front matter
         $text = preg_replace('/```.*?```/su', ' ', $text) ?? $text;          // code fences
-        $text = preg_replace('/!\[[^\]]*\]\([^)]*\)/u', ' ', $text) ?? $text; // obrázky
-        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/u', '$1', $text) ?? $text; // odkazy
-        $text = preg_replace('/^\s*\|?[\s:|-]*\|[\s:|-]*$/mu', ' ', $text) ?? $text; // oddeľovače tabuliek
-        $text = preg_replace('/^[>#\-\*\+\d\.\s]+/mu', '', $text) ?? $text;  // prefixy
-        $text = preg_replace('/^\[[ xX]\]\s*/mu', '', $text) ?? $text;       // odškrtávacie políčka
-        $text = str_replace('|', ' ', $text);                                // zvyšné bunky tabuliek
-        $text = preg_replace('/[*_`~]+/u', '', $text) ?? $text;              // zvyšné značky
+        $text = preg_replace('/!\[[^\]]*\]\([^)]*\)/u', ' ', $text) ?? $text; // images
+        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/u', '$1', $text) ?? $text; // links
+        $text = preg_replace('/^\s*\|?[\s:|-]*\|[\s:|-]*$/mu', ' ', $text) ?? $text; // table separators
+        $text = preg_replace('/^[>#\-\*\+\d\.\s]+/mu', '', $text) ?? $text;  // line prefixes
+        $text = preg_replace('/^\[[ xX]\]\s*/mu', '', $text) ?? $text;       // task checkboxes
+        $text = str_replace('|', ' ', $text);                                // remaining table cells
+        $text = preg_replace('/[*_`~]+/u', '', $text) ?? $text;              // leftover marks
         $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
         $text = trim($text);
 
@@ -70,7 +71,7 @@ final class Str
         return rtrim(mb_substr($text, 0, $length, 'UTF-8')) . '…';
     }
 
-    /** Prvý H1 nadpis z Markdownu, ak existuje. */
+    /** The first H1 heading in a Markdown document, if there is one. */
     public static function headingFromMarkdown(string $markdown): ?string
     {
         if (preg_match('/^\s*#\s+(.+)$/mu', $markdown, $m)) {

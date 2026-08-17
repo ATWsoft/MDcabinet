@@ -43,7 +43,7 @@ final class SearchController
         return Response::json(['query' => $query, 'results' => $results]);
     }
 
-    /** Vyznačí nájdený výraz v úryvku (frontend ho renderuje ako <mark>). */
+    /** Marks the match inside the excerpt; the frontend renders it as <mark>. */
     private static function highlight(string $text, string $query): string
     {
         $needle = preg_quote($query, '/');

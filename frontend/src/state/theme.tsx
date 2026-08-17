@@ -24,7 +24,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     () => window.matchMedia('(prefers-color-scheme: dark)').matches,
   )
 
-  // Systémovú tému sledujeme aj počas behu – používateľ ju môže prepnúť v OS.
+  // The system theme is watched at runtime too – it can change in the OS.
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
     const onChange = (event: MediaQueryListEvent) => setSystemDark(event.matches)
@@ -57,7 +57,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext)
-  if (!context) throw new Error('useTheme musí byť vnútri <ThemeProvider>')
+  if (!context) throw new Error('useTheme must be used inside <ThemeProvider>')
 
   return context
 }

@@ -1,9 +1,10 @@
 # ---------------------------------------------------------------------------
-#  MDcabinet – hlavný .htaccess (webroot = koreň projektu)
+#  MDcabinet – main .htaccess (web root = project root)
 #
-#  Všetko je zabalené v <IfModule>, aby jeden chýbajúci modul nezhodil celý
-#  web na 500. Ak hosting nemá mod_rewrite, aplikácia funguje ďalej –
-#  frontend si sám prepne na adresy typu /index.php/api/... (viď docs/DEPLOY.md).
+#  Everything is wrapped in <IfModule> so that one missing module cannot take
+#  the whole site down with a 500. If the hosting has no mod_rewrite the app
+#  still works – the frontend switches to /index.php/api/... style URLs
+#  (see docs/DEPLOY.md).
 # ---------------------------------------------------------------------------
 
 <IfModule mod_autoindex.c>
@@ -15,23 +16,23 @@ DirectoryIndex index.php
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # --- citlivé adresáre a súbory ---
+    # --- sensitive directories and files ---
     RewriteRule ^(app|config|database|frontend|docs|docker|bin)/ - [F,L]
     RewriteRule ^storage/ - [F,L]
     RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|\.env.*)$ - [F,L]
 
-    # --- existujúce súbory a adresáre servuj priamo (assets, favicon) ---
+    # --- serve existing files and directories directly (assets, favicon) ---
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# --- kompresia ---
+# --- compression ---
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>
 
-# --- cache pre buildnuté assety (majú hash v názve) ---
+# --- long cache for built assets (their names contain a hash) ---
 <IfModule mod_headers.c>
     <FilesMatch "\.(js|css|woff2?)$">
         Header set Cache-Control "public, max-age=31536000, immutable"

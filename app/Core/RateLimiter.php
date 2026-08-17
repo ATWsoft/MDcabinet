@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace MDcabinet\Core;
 
 /**
- * Súborový rate limiter pre citlivé endpointy (login, registrácia, share heslo).
- * Zámerne bez Redisu – na klasickom hostingu žiadny nie je.
+ * File based rate limiter for sensitive endpoints (sign in, registration,
+ * share password). Deliberately not Redis – shared hosting does not have one.
  */
 final class RateLimiter
 {
@@ -27,7 +27,8 @@ final class RateLimiter
 
         if ($data['count'] > $maxAttempts) {
             $wait = max(1, $data['reset'] - $now);
-            throw new HttpException(429, "Príliš veľa pokusov. Skús to znova o {$wait} s.");
+
+            throw new HttpException(429, Lang::t('Too many attempts. Try again in {seconds} s.', ['seconds' => $wait]));
         }
 
         @file_put_contents($file, json_encode($data), LOCK_EX);

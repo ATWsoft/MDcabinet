@@ -6,12 +6,13 @@ namespace MDcabinet\Http\Controllers;
 
 use MDcabinet\Core\Config;
 use MDcabinet\Core\Database;
+use MDcabinet\Core\Lang;
 use MDcabinet\Core\Request;
 use MDcabinet\Core\Response;
 
 /**
- * Servuje HTML obal pre React aplikáciu. Cesty k JS/CSS berie z Vite manifestu,
- * takže sa nič nemusí ručne prepisovať po builde.
+ * Serves the HTML shell for the React application. JS/CSS paths come from the
+ * Vite manifest, so nothing has to be rewritten by hand after a build.
  */
 final class SpaController
 {
@@ -29,6 +30,8 @@ final class SpaController
             'basePath'  => $base,
             'appName'   => Config::get('app.name', 'MDcabinet'),
             'installed' => $this->isInstalled(),
+            'locale'    => Lang::locale(),
+            'locales'   => Lang::SUPPORTED,
         ];
 
         $styles = '';
@@ -37,7 +40,7 @@ final class SpaController
         }
 
         $html = '<!doctype html>'
-            . '<html lang="sk" class="h-full">'
+            . '<html lang="' . htmlspecialchars(Lang::locale(), ENT_QUOTES) . '" class="h-full">'
             . '<head>'
             . '<meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
@@ -105,14 +108,19 @@ final class SpaController
 
     private function missingBuildPage(): string
     {
-        return '<!doctype html><html lang="sk"><meta charset="utf-8"><title>MDcabinet</title>'
+        $heading = Lang::t('The MDcabinet frontend has not been built yet');
+        $intro   = Lang::t('The backend is running, but the assets/ directory is missing. Generate it locally:');
+        $outro   = Lang::t('Then upload the contents of assets/ to your hosting (together with the rest of the app).');
+
+        return '<!doctype html><html lang="' . htmlspecialchars(Lang::locale(), ENT_QUOTES) . '">'
+            . '<meta charset="utf-8"><title>MDcabinet</title>'
             . '<style>body{font:16px/1.7 ui-sans-serif,system-ui,sans-serif;max-width:44rem;margin:12vh auto;padding:0 1.5rem;color:#1f2430}'
             . 'code{background:#eef1f6;padding:.15em .45em;border-radius:.3em;font-size:.95em}'
             . 'pre{background:#111827;color:#e5e7eb;padding:1rem 1.2rem;border-radius:.6rem;overflow:auto}</style>'
-            . '<h1>MDcabinet ešte nemá zbuildovaný frontend</h1>'
-            . '<p>Backend beží, ale chýba adresár <code>assets/</code>. Vygeneruj ho lokálne:</p>'
-            . '<pre>cd frontend\nnpm install\nnpm run build</pre>'
-            . '<p>Potom nahraj obsah adresára <code>assets/</code> na hosting (spolu so zvyškom aplikácie).</p>'
+            . '<h1>' . htmlspecialchars($heading, ENT_QUOTES) . '</h1>'
+            . '<p>' . htmlspecialchars($intro, ENT_QUOTES) . '</p>'
+            . '<pre>cd frontend' . PHP_EOL . 'npm install' . PHP_EOL . 'npm run build</pre>'
+            . '<p>' . htmlspecialchars($outro, ENT_QUOTES) . '</p>'
             . '</html>';
     }
 }

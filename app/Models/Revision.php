@@ -11,7 +11,7 @@ final class Revision extends Model
     protected const TABLE = 'document_revisions';
     protected const SOFT_DELETE = null;
 
-    /** Koľko revízií na dokument držíme (staršie sa priebežne mažú). */
+    /** How many revisions per document are kept; older ones are pruned. */
     public const KEEP = 100;
 
     public static function record(
@@ -44,7 +44,7 @@ final class Revision extends Model
     }
 
     /**
-     * Zoznam revízií bez obsahu (obsah sa ťahá až pri náhľade/diffe).
+     * Revisions without their content (content is loaded on demand).
      *
      * @return list<array<string,mixed>>
      */

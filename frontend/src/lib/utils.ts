@@ -1,38 +1,47 @@
-/** Drobné pomôcky používané naprieč UI. */
+/** Small helpers used across the UI. */
 
-/** Spojenie tried s odfiltrovaním prázdnych hodnôt. */
+import { activeLocale, type Locale } from '@/lib/i18n'
+
+/** Joins class names, dropping the empty ones. */
 export function cx(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(' ')
 }
 
-const RELATIVE = new Intl.RelativeTimeFormat('sk', { numeric: 'auto' })
-const FULL = new Intl.DateTimeFormat('sk-SK', { dateStyle: 'medium', timeStyle: 'short' })
+function intlLocale(locale: Locale = activeLocale()): string {
+  return locale === 'sk' ? 'sk-SK' : 'en-GB'
+}
 
-/** "pred 5 minútami", "včera", … Vstup je MySQL DATETIME. */
+/** "5 minutes ago", "yesterday", … Input is a MySQL DATETIME. */
 export function timeAgo(value: string | null | undefined): string {
   if (!value) return ''
 
   const then = parseDate(value)
   if (!then) return ''
 
+  const relative = new Intl.RelativeTimeFormat(intlLocale(), { numeric: 'auto' })
   const seconds = Math.round((then.getTime() - Date.now()) / 1000)
   const abs = Math.abs(seconds)
 
-  if (abs < 45) return 'práve teraz'
-  if (abs < 3600) return RELATIVE.format(Math.round(seconds / 60), 'minute')
-  if (abs < 86_400) return RELATIVE.format(Math.round(seconds / 3600), 'hour')
-  if (abs < 2_592_000) return RELATIVE.format(Math.round(seconds / 86_400), 'day')
-  if (abs < 31_536_000) return RELATIVE.format(Math.round(seconds / 2_592_000), 'month')
+  if (abs < 45) return relative.format(0, 'second')
+  if (abs < 3600) return relative.format(Math.round(seconds / 60), 'minute')
+  if (abs < 86_400) return relative.format(Math.round(seconds / 3600), 'hour')
+  if (abs < 2_592_000) return relative.format(Math.round(seconds / 86_400), 'day')
+  if (abs < 31_536_000) return relative.format(Math.round(seconds / 2_592_000), 'month')
 
-  return RELATIVE.format(Math.round(seconds / 31_536_000), 'year')
+  return relative.format(Math.round(seconds / 31_536_000), 'year')
 }
 
 export function formatDateTime(value: string | null | undefined): string {
   const date = value ? parseDate(value) : null
-  return date ? FULL.format(date) : ''
+  if (!date) return ''
+
+  return new Intl.DateTimeFormat(intlLocale(), {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
-/** MySQL vracia "2026-08-16 18:36:26" – Safari to bez prerobenia neprečíta. */
+/** MySQL returns "2026-08-16 18:36:26" – Safari cannot parse that as is. */
 function parseDate(value: string): Date | null {
   const normalized = value.includes('T') ? value : value.replace(' ', 'T')
   const date = new Date(normalized)
@@ -46,7 +55,7 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-/** Odloží volanie funkcie – používa sa pri hľadaní za behu a autosave. */
+/** Delays a call – used by live search and autosave. */
 export function debounce<T extends (...args: never[]) => void>(fn: T, delay: number) {
   let timer: ReturnType<typeof setTimeout> | undefined
 
@@ -59,22 +68,7 @@ export function debounce<T extends (...args: never[]) => void>(fn: T, delay: num
   return debounced
 }
 
-/**
- * Slovenské skloňovanie podľa počtu: 1 slovo / 2–4 slová / 5+ slov.
- */
-export function plural(count: number, one: string, few: string, many: string): string {
-  if (count === 1) return one
-  if (count >= 2 && count <= 4) return few
-
-  return many
-}
-
-/** "46 slov" aj s číslom naformátovaným po slovensky. */
-export function pluralize(count: number, one: string, few: string, many: string): string {
-  return `${count.toLocaleString('sk-SK')} ${plural(count, one, few, many)}`
-}
-
-/** Iniciály pre avatar. */
+/** Initials for the avatar. */
 export function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -86,5 +80,5 @@ export function initials(name: string): string {
 
 export const isMac = /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent)
 
-/** "Ctrl" vs "⌘" podľa platformy. */
+/** "Ctrl" vs "⌘" depending on the platform. */
 export const modKey = isMac ? '⌘' : 'Ctrl'

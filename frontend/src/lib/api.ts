@@ -1,8 +1,12 @@
 /**
- * Tenký klient nad PHP API.
+ * Thin client for the PHP API.
  *
- * - Autentifikácia stojí na session cookie, takže stačí `credentials: 'same-origin'`.
- * - CSRF token držíme v pamäti; keď vyprší, raz ho automaticky obnovíme a request zopakujeme.
+ * - Authentication rides on the session cookie, so `credentials: 'same-origin'`
+ *   is all that is needed.
+ * - The CSRF token is kept in memory; when it expires it is refreshed once
+ *   automatically and the request is retried.
+ * - The active language travels in X-Locale so API messages come back
+ *   in the language the user actually sees.
  */
 
 import type {
@@ -12,7 +16,13 @@ import type {
 
 declare global {
   interface Window {
-    __MDCABINET__?: { basePath: string; appName: string; installed: boolean }
+    __MDCABINET__?: {
+      basePath: string
+      appName: string
+      installed: boolean
+      locale?: string
+      locales?: string[]
+    }
   }
 }
 
@@ -23,14 +33,15 @@ export const bootstrap = window.__MDCABINET__ ?? {
 }
 
 /**
- * Nie každý hosting má funkčný mod_rewrite. Preto sa pri štarte zistí,
- * ktorý tvar adries funguje:
+ * Not every hosting has a working mod_rewrite. On start-up the app finds out
+ * which URL shape works:
  *
- *   pekné adresy   /api/auth/me              (rewrite funguje)
- *   záložné adresy /index.php/api/auth/me    (rewrite nefunguje)
+ *   pretty   /api/auth/me
+ *   pathinfo /index.php/api/auth/me
+ *   query    /index.php?_route=/api/auth/me
  *
- * Podľa výsledku sa zvolí aj typ routera – bez rewritu musí frontend
- * používať hash routing, inak by priame odkazy na dokumenty končili 404.
+ * The routing mode also decides the router type – without rewrite the frontend
+ * has to use hash routing, otherwise deep links would 404 on the server.
  */
 export type ApiMode = 'pretty' | 'pathinfo' | 'query'
 
@@ -38,6 +49,8 @@ const MODE_KEY = 'mdcabinet.apiMode'
 const MODES: ApiMode[] = ['pretty', 'pathinfo', 'query']
 
 let apiMode: ApiMode = 'pretty'
+let csrfToken: string | null = null
+let requestLocale: string | null = null
 
 export function currentApiMode(): ApiMode {
   return apiMode
@@ -47,9 +60,18 @@ export function usesPrettyUrls(): boolean {
   return apiMode === 'pretty'
 }
 
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token
+}
+
+/** Language sent with every request so the API answers in it. */
+export function setRequestLocale(locale: string | null): void {
+  requestLocale = locale
+}
+
 /**
- * Zloží adresu API volania pre aktuálny režim.
- * `path` je napr. `/search?q=abc`.
+ * Builds the URL of an API call for the current mode.
+ * `path` looks like `/search?q=abc`.
  */
 function buildUrl(path: string, mode: ApiMode = apiMode): string {
   const base = bootstrap.basePath
@@ -64,11 +86,11 @@ function buildUrl(path: string, mode: ApiMode = apiMode): string {
   return `${base}/index.php?${params.toString()}`
 }
 
-/** Adresa verejného zdieľaného odkazu v tvare, ktorý na tomto hostingu funguje. */
+/** URL of a public share link in the shape that works on this hosting. */
 export function publicShareUrl(token: string): string {
   const origin = `${window.location.origin}${bootstrap.basePath}`
 
-  // Bez rewritu beží SPA na hash routeri, takže odkaz musí mať mriežku.
+  // Without rewrite the SPA uses a hash router, so the link needs the hash.
   return apiMode === 'pretty' ? `${origin}/s/${token}` : `${origin}/#/s/${token}`
 }
 
@@ -77,11 +99,26 @@ function applyMode(mode: ApiMode): void {
   try {
     sessionStorage.setItem(MODE_KEY, mode)
   } catch {
-    /* privátny režim prehliadača – nevadí, zistí sa to znova */
+    /* private browsing – it will simply be detected again */
   }
 }
 
-/** Odpovedá endpoint naším JSON-om (a nie chybovou stránkou hostingu)? */
+export function setApiMode(mode: ApiMode): void {
+  applyMode(mode)
+}
+
+/** The mode confirmed by an earlier page load, if there is one. */
+export function cachedApiMode(): ApiMode | null {
+  try {
+    const cached = sessionStorage.getItem(MODE_KEY)
+
+    return cached && MODES.includes(cached as ApiMode) ? (cached as ApiMode) : null
+  } catch {
+    return null
+  }
+}
+
+/** Does the endpoint answer with our JSON (and not the hosting error page)? */
 async function probe(mode: ApiMode): Promise<boolean> {
   try {
     const response = await fetch(buildUrl('/auth/me', mode), {
@@ -98,23 +135,12 @@ async function probe(mode: ApiMode): Promise<boolean> {
   }
 }
 
-/** Už overený režim z predchádzajúceho načítania, ak nejaký je. */
-export function cachedApiMode(): ApiMode | null {
-  try {
-    const cached = sessionStorage.getItem(MODE_KEY)
-
-    return cached && MODES.includes(cached as ApiMode) ? (cached as ApiMode) : null
-  } catch {
-    return null
-  }
-}
-
 /**
- * Vyskúša režimy v poradí a zapamätá prvý funkčný.
+ * Tries the modes in order and remembers the first that works.
  *
- * Appka sa nevykreslí až po tomto teste – štartuje optimisticky s peknými
- * adresami a detekcia beží na pozadí (viď main.tsx). Na hostingu, kde
- * rewrite funguje, teda nestojí ani jeden krok navyše.
+ * The app does not wait for this before rendering: it starts optimistically
+ * with pretty URLs and the detection runs alongside (see main.tsx), so a
+ * healthy hosting pays nothing extra.
  */
 export async function detectApiMode(): Promise<ApiMode> {
   for (const mode of MODES) {
@@ -124,23 +150,12 @@ export async function detectApiMode(): Promise<ApiMode> {
     }
   }
 
-  // Ani jeden režim neprešiel – necháme pekné adresy a chybu ohlási samotná appka.
   applyMode('pretty')
 
   return 'pretty'
 }
 
-export function setApiMode(mode: ApiMode): void {
-  applyMode(mode)
-}
-
-let csrfToken: string | null = null
-
-export function setCsrfToken(token: string | null): void {
-  csrfToken = token
-}
-
-/** Chyba z API aj s validačnými hláškami po jednotlivých poliach. */
+/** An API error, including per-field validation messages. */
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -151,7 +166,7 @@ export class ApiError extends Error {
     this.name = 'ApiError'
   }
 
-  /** Hláška pre konkrétne pole formulára. */
+  /** The message for one form field. */
   fieldError(field: string): string | undefined {
     return this.errors[field]
   }
@@ -173,6 +188,7 @@ async function send<T>(method: Method, path: string, body?: unknown, retry = tru
 
   if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   if (csrfToken && method !== 'GET') headers['X-CSRF-Token'] = csrfToken
+  if (requestLocale) headers['X-Locale'] = requestLocale
 
   const response = await fetch(buildUrl(path), {
     method,
@@ -188,11 +204,11 @@ async function send<T>(method: Method, path: string, body?: unknown, retry = tru
   if (!response.ok) {
     const error = new ApiError(
       response.status,
-      typeof payload.message === 'string' ? payload.message : 'Požiadavka zlyhala.',
+      typeof payload.message === 'string' ? payload.message : 'The request failed.',
       (payload.errors ?? {}) as Record<string, string>,
     )
 
-    // Vypršaný CSRF token vieme obnoviť potichu – používateľ o tom nemusí vedieť.
+    // An expired CSRF token can be refreshed silently.
     if (error.isCsrfExpired && retry) {
       const me = await send<{ csrf: string }>('GET', '/auth/me', undefined, false)
       setCsrfToken(me.csrf)
@@ -225,15 +241,12 @@ export const api = {
     me: () => get<{ user: User | null; csrf: string; instance: Instance }>('/auth/me'),
     login: (email: string, password: string) =>
       post<{ user: User; csrf: string }>('/auth/login', { email, password }),
-    register: (email: string, name: string, password: string, registrationCode?: string) =>
-      post<{ user: User; csrf: string }>('/auth/register', {
-        email,
-        name,
-        password,
-        registrationCode: registrationCode || undefined,
-      }),
+    register: (data: {
+      email: string; name: string; password: string
+      locale?: string; registrationCode?: string
+    }) => post<{ user: User; csrf: string }>('/auth/register', data),
     logout: () => post<{ ok: boolean }>('/auth/logout'),
-    updateProfile: (data: { name: string; avatarColor?: string }) =>
+    updateProfile: (data: { name: string; avatarColor?: string; locale?: string }) =>
       put<{ user: User }>('/auth/profile', data),
     changePassword: (currentPassword: string, newPassword: string) =>
       put<{ ok: boolean }>('/auth/password', { currentPassword, newPassword }),
@@ -244,6 +257,8 @@ export const api = {
     updateSettings: (data: Partial<Pick<AdminSettings, 'registrationOpen' | 'registrationCode'>>) =>
       put<{ settings: AdminSettings }>('/admin/settings', data),
     suggestCode: () => post<{ code: string }>('/admin/registration-code'),
+    migrations: () => get<{ pending: string[]; applied: string[] }>('/admin/migrations'),
+    runMigrations: () => post<{ ran: string[]; pending: string[] }>('/admin/migrations'),
   },
 
   dashboard: () => get<{ cabinets: Cabinet[]; recent: DocumentSummary[] }>('/dashboard'),

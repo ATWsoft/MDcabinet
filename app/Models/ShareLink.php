@@ -86,6 +86,8 @@ final class ShareLink
     {
         return [
             'token'        => $share['token'],
+            // The frontend rebuilds this URL for the routing mode in use;
+            // this value is a sensible default for pretty URLs.
             'url'          => Config::url() . '/s/' . $share['token'],
             'targetType'   => $share['target_type'],
             'targetId'     => (int) $share['target_id'],

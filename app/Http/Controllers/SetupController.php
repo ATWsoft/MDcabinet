@@ -7,6 +7,7 @@ namespace MDcabinet\Http\Controllers;
 use MDcabinet\Core\Config;
 use MDcabinet\Core\Database;
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Lang;
 use MDcabinet\Core\Migrator;
 use MDcabinet\Core\Request;
 use MDcabinet\Core\Response;
@@ -16,10 +17,10 @@ use PDO;
 use PDOException;
 
 /**
- * Webový inštalátor pre hostingy bez SSH: overí prostredie, vyskúša pripojenie
- * k DB, zapíše config/config.php a spustí migrácie.
+ * Web installer for hostings without SSH: it checks the environment, tries
+ * the database connection, writes config/config.php and runs the migrations.
  *
- * Po dokončení sa endpointy samy uzamknú (existuje config aj používatelia).
+ * Once finished the endpoints lock themselves (a config and users both exist).
  */
 final class SetupController
 {
@@ -77,7 +78,7 @@ final class SetupController
 
         $this->writeConfig($config);
 
-        // Prepneme bežiaci proces na novú konfiguráciu a rozbehneme migrácie.
+        // Switch the running process over to the new configuration and migrate.
         foreach ($config['db'] as $key => $value) {
             Config::set('db.' . $key, $value);
         }
@@ -93,7 +94,7 @@ final class SetupController
         ]);
     }
 
-    // -------------------------------------------------------------- interné ---
+    // ------------------------------------------------------------- internals ---
 
     private function isInstalled(): bool
     {
@@ -111,7 +112,7 @@ final class SetupController
     private function assertNotInstalled(): void
     {
         if ($this->isInstalled()) {
-            throw HttpException::forbidden('MDcabinet je už nainštalovaný.');
+            throw HttpException::forbidden(Lang::t('MDcabinet is already installed.'));
         }
     }
 
@@ -130,35 +131,37 @@ final class SetupController
         foreach (['pdo_mysql', 'mbstring', 'json', 'fileinfo'] as $ext) {
             $checks[] = [
                 'key'    => 'ext_' . $ext,
-                'label'  => 'Rozšírenie ' . $ext,
+                'label'  => Lang::t('Extension {name}', ['name' => $ext]),
                 'ok'     => extension_loaded($ext),
-                'detail' => extension_loaded($ext) ? 'k dispozícii' : 'chýba',
+                'detail' => extension_loaded($ext) ? Lang::t('available') : Lang::t('missing'),
             ];
         }
 
         $checks[] = [
             'key'    => 'ext_gd',
-            'label'  => 'Rozšírenie gd (voliteľné – rozmery obrázkov)',
+            'label'  => Lang::t('Extension gd (optional – image dimensions)'),
             'ok'     => extension_loaded('gd'),
-            'detail' => extension_loaded('gd') ? 'k dispozícii' : 'chýba (appka funguje aj bez neho)',
+            'detail' => extension_loaded('gd')
+                ? Lang::t('available')
+                : Lang::t('missing (the app works without it)'),
         ];
 
         foreach (['config' => MDC_ROOT . '/config', 'storage' => MDC_STORAGE] as $label => $path) {
             $checks[] = [
                 'key'    => 'writable_' . $label,
-                'label'  => 'Zapisovateľný adresár ' . $label . '/',
+                'label'  => Lang::t('Writable directory {name}/', ['name' => $label]),
                 'ok'     => is_dir($path) && is_writable($path),
                 'detail' => is_dir($path)
-                    ? (is_writable($path) ? 'OK' : 'nastav práva 755/775')
-                    : 'adresár neexistuje',
+                    ? (is_writable($path) ? 'OK' : Lang::t('set permissions to 755 or 775'))
+                    : Lang::t('the directory does not exist'),
             ];
         }
 
         $checks[] = [
             'key'    => 'assets',
-            'label'  => 'Zbuildované frontend súbory (assets/)',
+            'label'  => Lang::t('Built frontend files (assets/)'),
             'ok'     => is_file(MDC_ROOT . '/assets/manifest.json') || is_file(MDC_ROOT . '/assets/.vite/manifest.json'),
-            'detail' => 'vytvorí ich `npm run build` v adresári frontend/',
+            'detail' => Lang::t('created by `npm run build` in the frontend/ directory'),
         ];
 
         return $checks;
@@ -175,8 +178,8 @@ final class SetupController
             );
         } catch (PDOException $e) {
             throw HttpException::validation(
-                ['dbHost' => 'Pripojenie zlyhalo: ' . $e->getMessage()],
-                'K databáze sa nepodarilo pripojiť.'
+                ['dbHost' => Lang::t('Could not connect: {error}', ['error' => $e->getMessage()])],
+                Lang::t('Could not connect to the database.')
             );
         }
     }
@@ -187,21 +190,23 @@ final class SetupController
         $path = MDC_ROOT . '/config/config.php';
 
         if (!is_writable(dirname($path))) {
-            throw new HttpException(500, 'Adresár config/ nie je zapisovateľný. Nastav mu práva 775 a skús znova.');
+            throw new HttpException(500, Lang::t(
+                'The config/ directory is not writable. Set its permissions to 775 and try again.'
+            ));
         }
 
-        $php = "<?php\n\n/**\n * Vygenerované inštalátorom MDcabinet " . date('Y-m-d H:i') . ".\n"
-             . " * Pokojne to tu uprav ručne – tvar zodpovedá config/config.example.php.\n */\n\n"
+        $php = "<?php\n\n/**\n * Generated by the MDcabinet installer on " . date('Y-m-d H:i') . ".\n"
+             . " * Feel free to edit it by hand – the shape matches config/config.example.php.\n */\n\n"
              . 'return ' . $this->export($config) . ";\n";
 
         if (@file_put_contents($path, $php, LOCK_EX) === false) {
-            throw new HttpException(500, 'Súbor config/config.php sa nepodarilo zapísať.');
+            throw new HttpException(500, Lang::t('config/config.php could not be written.'));
         }
 
         @chmod($path, 0640);
     }
 
-    /** var_export s odsadením, ktoré sa dá čítať. */
+    /** var_export with indentation that is actually readable. */
     private function export(mixed $value, int $indent = 0): string
     {
         $pad = str_repeat('    ', $indent);

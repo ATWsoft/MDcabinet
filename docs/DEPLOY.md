@@ -115,13 +115,18 @@ takže sa všetko načíta správne.
 ## Aktualizácia na novšiu verziu
 
 1. Zbuilduj frontend (`npm run build`).
-2. Nahraj `app/`, `assets/`, `database/`, `index.php`, `.htaccess`.
+2. Nahraj `app/`, `assets/`, **`database/`**, `index.php`, `.htaccess`.
    `config/config.php` ani `storage/` **neprepisuj**.
-3. Spusti migrácie – buď `php bin/migrate.php`, alebo otvor `/setup`
-   (ak už je nainštalované, migrácie sa dajú spustiť aj tak, že sa dočasne
-   premenuje `config/config.php`; jednoduchšie je použiť CLI).
+3. Spusti migrácie: prihlás sa ako správca a v *Nastaveniach účtu → Databáza*
+   klikni na **Spustiť migrácie**. So SSH funguje aj `php bin/migrate.php`.
+
+> ⚠️ **Na `database/` sa nezabudni.** Nová verzia so sebou nesie nové migrácie
+> a bez nich appka pracuje so starou schémou. Sekcia *Databáza* v nastaveniach
+> ukáže, či niečo čaká; to isté hlási aj `mdcabinet-check.php`.
 
 Migrácie sú evidované v tabuľke `migrations`, takže sa nikdy nespustia dvakrát.
+Prihlásenie funguje aj s nespustenou migráciou, takže sa vždy dostaneš dovnútra
+a vieš ich dobehnúť z aplikácie.
 
 ## Zálohovanie
 
@@ -210,5 +215,7 @@ Po vyriešení problému súbor zmaž – vypisuje informácie o serveri.
 | Inštalátor sa načíta, ale „Kontrola prostredia“ je prázdna a v konzole sú 404 na `/api/...` | Hosting nemá `mod_rewrite`. Nahraj aktuálnu verziu appky – prepne sa na záložný režim sama. Over cez `mdcabinet-check.php`. |
 | Všetko vracia 404 okrem úvodnej stránky | To isté – ignorovaný `.htaccess` alebo `AllowOverride None`. |
 | Inštalátor hlási, že `config/` nie je zapisovateľný | Nastav práva 775, alebo vytvor `config/config.php` ručne podľa `config.example.php`. |
+| Niektorá akcia vracia 500 s hláškou „Nastala neočakávaná chyba na serveri“ | Otvor `mdcabinet-check.php` – na konci vypíše posledné záznamy z logu. Najčastejšou príčinou je nespustená migrácia (nenahrané `database/`). |
+| Appka hlási chýbajúce PHP rozšírenie | Zapni ho v administrácii hostingu. `pdo_mysql`, `mbstring` a `json` sú povinné. |
 | Prihlásenie sa hneď stratí | Hosting nemá zapisovateľný adresár pre session, alebo appka beží raz na `www.` a raz bez `www.`. Zjednoť doménu. |
 | Nahrávanie väčších obrázkov zlyhá | Zvýš `upload_max_filesize` a `post_max_size` v PHP a `uploads.max_size` v configu. |

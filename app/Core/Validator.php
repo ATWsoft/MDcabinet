@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace MDcabinet\Core;
 
 /**
- * Jednoduchá validácia s pravidlami v tvare 'required|string|max:190'.
- * Pri chybe vyhodí HttpException::validation() s mapou pole => hláška.
+ * Small rule-based validator: 'required|string|max:190'.
+ * On failure it throws HttpException::validation() with a field => message map.
  */
 final class Validator
 {
@@ -19,7 +19,7 @@ final class Validator
     /**
      * @param array<string,mixed>  $data
      * @param array<string,string> $rules
-     * @return array<string,mixed> validované hodnoty
+     * @return array<string,mixed> the validated values
      */
     public static function check(array $data, array $rules): array
     {
@@ -46,8 +46,8 @@ final class Validator
         $required = in_array('required', $rules, true);
         $nullable = in_array('nullable', $rules, true);
 
-        // Pravidlo `raw` = hodnotu neorezávaj. Používa ho obsah dokumentu:
-        // v Markdowne sú koncové prázdne riadky súčasťou textu.
+        // The `raw` rule means "do not trim". Document content uses it:
+        // in Markdown, trailing blank lines are part of the text.
         if (is_string($value) && !in_array('raw', $rules, true)) {
             $value = trim($value);
         }
@@ -56,11 +56,11 @@ final class Validator
 
         if ($missing) {
             if ($required) {
-                $this->errors[$field] = 'Pole je povinné.';
+                $this->errors[$field] = Lang::t('This field is required.');
                 return;
             }
             if (!$nullable && !array_key_exists($field, $data)) {
-                return; // pole vôbec neprišlo – neriešime
+                return; // the field was not submitted at all – nothing to check
             }
             $this->valid[$field] = $value === '' && !$nullable ? '' : null;
             return;
@@ -72,14 +72,14 @@ final class Validator
             switch ($name) {
                 case 'string':
                     if (!is_string($value)) {
-                        $this->errors[$field] = 'Očakáva sa text.';
+                        $this->errors[$field] = Lang::t('Text expected.');
                         return;
                     }
                     break;
 
                 case 'int':
                     if (!is_numeric($value)) {
-                        $this->errors[$field] = 'Očakáva sa číslo.';
+                        $this->errors[$field] = Lang::t('A number is expected.');
                         return;
                     }
                     $value = (int) $value;
@@ -91,7 +91,7 @@ final class Validator
 
                 case 'email':
                     if (!filter_var((string) $value, FILTER_VALIDATE_EMAIL)) {
-                        $this->errors[$field] = 'Neplatná e-mailová adresa.';
+                        $this->errors[$field] = Lang::t('Invalid e-mail address.');
                         return;
                     }
                     $value = mb_strtolower((string) $value);
@@ -99,22 +99,22 @@ final class Validator
 
                 case 'min':
                     if (is_string($value) && mb_strlen($value, 'UTF-8') < (int) $param) {
-                        $this->errors[$field] = 'Minimálna dĺžka je ' . $param . ' znakov.';
+                        $this->errors[$field] = Lang::t('Minimum length: {min} characters.', ['min' => (int) $param]);
                         return;
                     }
                     if (is_int($value) && $value < (int) $param) {
-                        $this->errors[$field] = 'Minimálna hodnota je ' . $param . '.';
+                        $this->errors[$field] = Lang::t('Minimum value: {min}.', ['min' => (int) $param]);
                         return;
                     }
                     break;
 
                 case 'max':
                     if (is_string($value) && mb_strlen($value, 'UTF-8') > (int) $param) {
-                        $this->errors[$field] = 'Maximálna dĺžka je ' . $param . ' znakov.';
+                        $this->errors[$field] = Lang::t('Maximum length: {max} characters.', ['max' => (int) $param]);
                         return;
                     }
                     if (is_int($value) && $value > (int) $param) {
-                        $this->errors[$field] = 'Maximálna hodnota je ' . $param . '.';
+                        $this->errors[$field] = Lang::t('Maximum value: {max}.', ['max' => (int) $param]);
                         return;
                     }
                     break;
@@ -122,21 +122,21 @@ final class Validator
                 case 'in':
                     $allowed = explode(',', (string) $param);
                     if (!in_array((string) $value, $allowed, true)) {
-                        $this->errors[$field] = 'Povolené hodnoty: ' . implode(', ', $allowed) . '.';
+                        $this->errors[$field] = Lang::t('Allowed values: {values}.', ['values' => implode(', ', $allowed)]);
                         return;
                     }
                     break;
 
                 case 'array':
                     if (!is_array($value)) {
-                        $this->errors[$field] = 'Očakáva sa zoznam.';
+                        $this->errors[$field] = Lang::t('A list is expected.');
                         return;
                     }
                     break;
 
                 case 'date':
                     if (strtotime((string) $value) === false) {
-                        $this->errors[$field] = 'Neplatný dátum.';
+                        $this->errors[$field] = Lang::t('Invalid date.');
                         return;
                     }
                     break;

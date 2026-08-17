@@ -1,6 +1,6 @@
 /**
- * Malá sada UI primitív. Zámerne v jednom súbore – appka ich má pár
- * a takto sa dajú udržiavať konzistentne bez preklikávania medzi súbormi.
+ * A small set of UI primitives. Deliberately in one file – the app has only a
+ * handful and this way they stay consistent without jumping between files.
  */
 
 import {
@@ -9,7 +9,9 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertCircle, Check, Loader2, X } from 'lucide-react'
+
 import { cx } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 
 /* -------------------------------------------------------------- Button --- */
 
@@ -96,6 +98,7 @@ export function Input({
           'block w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-ink-900 shadow-sm',
           'ring-1 ring-inset transition placeholder:text-ink-400',
           'focus:ring-2 focus:ring-inset focus:ring-accent-500',
+          'disabled:bg-ink-50 disabled:text-ink-400 dark:disabled:bg-ink-800/50',
           'dark:bg-ink-800 dark:text-white dark:placeholder:text-ink-500',
           error
             ? 'ring-red-400 dark:ring-red-500'
@@ -147,6 +150,50 @@ export function Textarea({
   )
 }
 
+/* --------------------------------------------------------------- Select --- */
+
+export function Select<T extends string>({
+  label, hint, value, options, onChange, disabled,
+}: {
+  label?: string
+  hint?: string
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (value: T) => void
+  disabled?: boolean
+}) {
+  const id = useId()
+
+  return (
+    <div className="space-y-1.5">
+      {label && (
+        <label htmlFor={id} className="block text-sm font-medium text-ink-700 dark:text-ink-200">
+          {label}
+        </label>
+      )}
+      <select
+        id={id}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as T)}
+        className={cx(
+          'block w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-ink-900 shadow-sm',
+          'ring-1 ring-inset ring-ink-200 transition',
+          'focus:ring-2 focus:ring-inset focus:ring-accent-500',
+          'dark:bg-ink-800 dark:text-white dark:ring-ink-700',
+        )}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {hint && <p className="text-[13px] text-ink-500 dark:text-ink-400">{hint}</p>}
+    </div>
+  )
+}
+
 /* --------------------------------------------------------------- Modal --- */
 
 interface ModalProps {
@@ -161,6 +208,7 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, description, children, footer, size = 'md' }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const { t } = useI18n()
 
   useEffect(() => {
     if (!open) return
@@ -212,7 +260,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
           </div>
           <button
             onClick={onClose}
-            aria-label="Zavrieť"
+            aria-label={t('Close')}
             className="-mr-1 -mt-1 rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800 dark:hover:text-white"
           >
             <X className="h-4 w-4" />
@@ -232,7 +280,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   )
 }
 
-/* ------------------------------------------------------------- Toasty --- */
+/* -------------------------------------------------------------- Toasts --- */
 
 interface Toast {
   id: number
@@ -300,22 +348,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 export function useToast(): ToastContextValue {
   const context = useContext(ToastContext)
-  if (!context) throw new Error('useToast musí byť vnútri <ToastProvider>')
+  if (!context) throw new Error('useToast must be used inside <ToastProvider>')
 
   return context
 }
 
-/* ------------------------------------------------------- Stavové bloky --- */
+/* --------------------------------------------------------- State blocks --- */
 
 export function Spinner({ className }: { className?: string }) {
   return <Loader2 className={cx('h-5 w-5 animate-spin text-ink-400', className)} />
 }
 
-export function PageLoader({ label = 'Načítavam…' }: { label?: string }) {
+export function PageLoader({ label }: { label?: string }) {
+  const { t } = useI18n()
+
   return (
     <div className="flex h-full min-h-48 flex-col items-center justify-center gap-3 text-ink-400">
       <Spinner className="h-6 w-6" />
-      <p className="text-sm">{label}</p>
+      <p className="text-sm">{label ?? t('Loading…')}</p>
     </div>
   )
 }
@@ -340,10 +390,10 @@ export function EmptyState({
   )
 }
 
-/* ------------------------------------------------- Potvrdzovací dialóg --- */
+/* ------------------------------------------------------- Confirm dialog --- */
 
 export function ConfirmDialog({
-  open, title, description, confirmLabel = 'Zmazať', note, onConfirm, onCancel, loading,
+  open, title, description, confirmLabel, note, onConfirm, onCancel, loading,
 }: {
   open: boolean
   title: string
@@ -354,6 +404,8 @@ export function ConfirmDialog({
   onCancel: () => void
   loading?: boolean
 }) {
+  const { t } = useI18n()
+
   return (
     <Modal
       open={open}
@@ -364,17 +416,17 @@ export function ConfirmDialog({
       footer={
         <>
           <Button onClick={onCancel} disabled={loading}>
-            Zrušiť
+            {t('Cancel')}
           </Button>
           <Button variant="danger" onClick={onConfirm} loading={loading}>
-            {confirmLabel}
+            {confirmLabel ?? t('Delete')}
           </Button>
         </>
       }
     >
       <p className="text-sm text-ink-600 dark:text-ink-300">
         {note ??
-          'Obsah sa v databáze označí ako zmazaný (neodstráni sa natvrdo), z aplikácie ale zmizne.'}
+          t('The content is flagged as deleted in the database (not removed for good), but it disappears from the app.')}
       </p>
     </Modal>
   )

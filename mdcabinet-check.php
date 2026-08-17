@@ -1,13 +1,13 @@
 <?php
 /**
- * MDcabinet – diagnostika hostingu.
+ * MDcabinet – hosting diagnostics.
  *
- * Samostatný súbor, ktorý nepotrebuje nič z aplikácie – funguje aj vtedy,
- * keď je appka rozbitá. Nahraj ho vedľa index.php a otvor v prehliadači:
+ * A standalone file that needs nothing from the application, so it works even
+ * when the app is broken. Upload it next to index.php and open it in a browser:
  *
- *     https://tvoja-domena.sk/mdcabinet-check.php
+ *     https://your-domain.com/mdcabinet-check.php
  *
- * Po vyriešení problému súbor ZMAŽ – vypisuje informácie o serveri.
+ * DELETE it once the problem is solved – it prints information about the server.
  */
 
 declare(strict_types=1);
@@ -27,50 +27,141 @@ $checks = [
 ];
 
 foreach (['pdo_mysql', 'mbstring', 'json', 'fileinfo'] as $extension) {
-    $checks['Rozšírenie ' . $extension] = check(
+    $checks['Extension ' . $extension] = check(
         extension_loaded($extension),
-        extension_loaded($extension) ? 'k dispozícii' : 'CHÝBA'
+        extension_loaded($extension) ? 'available' : 'MISSING'
     );
 }
 
-$checks['Rozšírenie gd (voliteľné)'] = check(
+$checks['Extension gd (optional)'] = check(
     extension_loaded('gd'),
-    extension_loaded('gd') ? 'k dispozícii' : 'chýba – appka funguje aj bez neho'
+    extension_loaded('gd') ? 'available' : 'missing – the app works without it'
 );
 
 foreach (['index.php', 'app/bootstrap.php', 'database/migrations', 'assets/manifest.json'] as $needed) {
-    $checks['Súbor ' . $needed] = check(
+    $checks['File ' . $needed] = check(
         file_exists($root . '/' . $needed),
-        file_exists($root . '/' . $needed) ? 'nahratý' : 'CHÝBA – nenahral si celý balík?'
+        file_exists($root . '/' . $needed) ? 'uploaded' : 'MISSING – did you upload the whole bundle?'
     );
 }
 
 foreach (['config', 'storage', 'storage/uploads', 'storage/logs'] as $directory) {
     $path = $root . '/' . $directory;
-    $checks['Zapisovateľné ' . $directory . '/'] = check(
+    $checks['Writable ' . $directory . '/'] = check(
         is_dir($path) && is_writable($path),
-        !is_dir($path) ? 'adresár neexistuje' : (is_writable($path) ? 'OK' : 'NIE – nastav práva 755 alebo 775')
+        !is_dir($path)
+            ? 'the directory does not exist'
+            : (is_writable($path) ? 'OK' : 'NO – set the permissions to 755 or 775')
     );
 }
 
-$checks['Konfigurácia config/config.php'] = check(
+$checks['Configuration config/config.php'] = check(
     is_file($root . '/config/config.php'),
-    is_file($root . '/config/config.php') ? 'existuje (inštalácia už prebehla)' : 'zatiaľ nie je – to je pred inštaláciou v poriadku'
+    is_file($root . '/config/config.php')
+        ? 'exists (the installation has already run)'
+        : 'not there yet – which is fine before installing'
 );
 
-// mod_rewrite sa dá spoľahlivo overiť len na mod_php; inde to otestuje JavaScript nižšie.
+// mod_rewrite can only be checked reliably under mod_php; elsewhere the
+// JavaScript test below answers the question.
 $modules = function_exists('apache_get_modules') ? apache_get_modules() : null;
-$checks['mod_rewrite (podľa Apache)'] = $modules === null
-    ? check(true, 'nedá sa zistiť z PHP – pozri test nižšie')
-    : check(in_array('mod_rewrite', $modules, true), in_array('mod_rewrite', $modules, true) ? 'zapnutý' : 'VYPNUTÝ');
+$checks['mod_rewrite (according to Apache)'] = $modules === null
+    ? check(true, 'cannot be determined from PHP – see the test below')
+    : check(in_array('mod_rewrite', $modules, true), in_array('mod_rewrite', $modules, true) ? 'enabled' : 'DISABLED');
+
+/**
+ * Migration status. Read directly through PDO so this page keeps working even
+ * when the application itself is broken.
+ *
+ * @return array{ok:bool,detail:string,pending:list<string>}
+ */
+function migrationStatus(string $root): array
+{
+    $configFile = $root . '/config/config.php';
+
+    // config/config.php first, MDC_* environment variables second (docker).
+    if (is_file($configFile)) {
+        /** @var array<string,mixed> $config */
+        $config = require $configFile;
+        $db = is_array($config['db'] ?? null) ? $config['db'] : [];
+    } elseif (getenv('MDC_DB_NAME') !== false) {
+        $db = [
+            'host' => getenv('MDC_DB_HOST') ?: 'localhost',
+            'port' => (int) (getenv('MDC_DB_PORT') ?: 3306),
+            'name' => getenv('MDC_DB_NAME'),
+            'user' => getenv('MDC_DB_USER') ?: '',
+            'pass' => getenv('MDC_DB_PASS') ?: '',
+        ];
+    } else {
+        return ['ok' => false, 'detail' => 'config/config.php does not exist yet', 'pending' => []];
+    }
+
+    $available = [];
+    foreach (glob($root . '/database/migrations/*.sql') ?: [] as $file) {
+        $available[] = basename($file);
+    }
+    sort($available, SORT_NATURAL);
+
+    if ($available === []) {
+        return [
+            'ok' => false,
+            'detail' => 'database/migrations/ is empty – did you upload the directory?',
+            'pending' => [],
+        ];
+    }
+
+    try {
+        $pdo = new PDO(
+            sprintf(
+                'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+                (string) ($db['host'] ?? 'localhost'),
+                (int) ($db['port'] ?? 3306),
+                (string) ($db['name'] ?? '')
+            ),
+            (string) ($db['user'] ?? ''),
+            (string) ($db['pass'] ?? ''),
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+        );
+
+        $applied = $pdo->query('SELECT `migration` FROM `migrations`')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    } catch (Throwable $e) {
+        return ['ok' => false, 'detail' => 'cannot be read: ' . $e->getMessage(), 'pending' => []];
+    }
+
+    $pending = array_values(array_diff($available, $applied));
+
+    return [
+        'ok' => $pending === [],
+        'detail' => $pending === []
+            ? sprintf('all %d migrations applied', count($available))
+            : sprintf('%d waiting: %s', count($pending), implode(', ', $pending)),
+        'pending' => $pending,
+    ];
+}
+
+$migrations = migrationStatus($root);
+$checks['Database migrations'] = check($migrations['ok'], $migrations['detail']);
+
+// Last log entries – usually the fastest way to explain a bare 500.
+$logEntries = '';
+$logFiles = glob($root . '/storage/logs/app-*.log') ?: [];
+if ($logFiles !== []) {
+    sort($logFiles);
+    $newest = end($logFiles);
+    $lines = @file($newest, FILE_IGNORE_NEW_LINES) ?: [];
+    $logEntries = implode("\n", array_slice($lines, -40));
+    $logLabel = basename((string) $newest);
+} else {
+    $logLabel = '';
+}
 
 $server = [
-    'SCRIPT_NAME'     => $_SERVER['SCRIPT_NAME'] ?? '–',
-    'REQUEST_URI'     => $_SERVER['REQUEST_URI'] ?? '–',
-    'DOCUMENT_ROOT'   => $_SERVER['DOCUMENT_ROOT'] ?? '–',
-    'Adresár skriptu' => $root,
-    'SERVER_SOFTWARE' => $_SERVER['SERVER_SOFTWARE'] ?? '–',
-    'HTTP_HOST'       => $_SERVER['HTTP_HOST'] ?? '–',
+    'SCRIPT_NAME'      => $_SERVER['SCRIPT_NAME'] ?? '-',
+    'REQUEST_URI'      => $_SERVER['REQUEST_URI'] ?? '-',
+    'DOCUMENT_ROOT'    => $_SERVER['DOCUMENT_ROOT'] ?? '-',
+    'Script directory' => $root,
+    'SERVER_SOFTWARE'  => $_SERVER['SERVER_SOFTWARE'] ?? '-',
+    'HTTP_HOST'        => $_SERVER['HTTP_HOST'] ?? '-',
 ];
 
 $failed = count(array_filter($checks, static fn (array $c) => !$c[0]));
@@ -79,7 +170,7 @@ $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'))
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MDcabinet – diagnostika</title>
+<title>MDcabinet – diagnostics</title>
 <style>
   body { font: 15px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif; max-width: 52rem;
          margin: 3rem auto; padding: 0 1.25rem; color: #1f2430; background: #f6f7f9; }
@@ -92,8 +183,8 @@ $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'))
   td:first-child { width: 45%; }
   td:last-child { color: #62718c; }
   tr:last-child td { border-bottom: 0; }
-  .ok::before { content: "✓"; color: #10b981; font-weight: 700; margin-right: .5rem; }
-  .bad::before { content: "✗"; color: #ef4444; font-weight: 700; margin-right: .5rem; }
+  .ok::before { content: "\2713"; color: #10b981; font-weight: 700; margin-right: .5rem; }
+  .bad::before { content: "\2717"; color: #ef4444; font-weight: 700; margin-right: .5rem; }
   code { background: #eceef2; padding: .1em .4em; border-radius: .25em; font-size: .9em;
          word-break: break-all; }
   .note { background: #fff8e6; border: 1px solid #f5d98a; border-radius: .75rem;
@@ -101,13 +192,13 @@ $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'))
   #routes div { padding: .35rem 0; }
 </style>
 
-<h1>MDcabinet – diagnostika hostingu</h1>
+<h1>MDcabinet – hosting diagnostics</h1>
 <p style="color:#62718c;margin-top:0">
-  <?= $failed === 0 ? 'Všetky serverové kontroly prešli.' : "Neprešlo kontrol: {$failed}." ?>
-  Po vyriešení problému tento súbor zmaž.
+  <?= $failed === 0 ? 'All server-side checks passed.' : "Checks failed: {$failed}." ?>
+  Delete this file once the problem is solved.
 </p>
 
-<h2>Prostredie</h2>
+<h2>Environment</h2>
 <div class="card">
   <table>
     <?php foreach ($checks as $label => [$ok, $detail]): ?>
@@ -119,16 +210,25 @@ $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'))
   </table>
 </div>
 
-<h2>Test smerovania</h2>
+<h2>Routing test</h2>
 <div class="card">
   <p style="margin-top:0">
-    MDcabinet potrebuje, aby aspoň jeden z týchto tvarov adries dorazil do <code>index.php</code>.
-    Appka si funkčný režim vyberie sama.
+    MDcabinet needs at least one of these URL shapes to reach <code>index.php</code>.
+    The app picks a working mode by itself.
   </p>
-  <div id="routes">Testujem…</div>
+  <div id="routes">Testing…</div>
 </div>
 
-<h2>Údaje o serveri</h2>
+<?php if ($logEntries !== ''): ?>
+  <h2>Last log entries (<?= htmlspecialchars($logLabel, ENT_QUOTES) ?>)</h2>
+  <div class="card">
+    <pre style="margin:0;overflow:auto;max-height:22rem;font-size:.8rem;line-height:1.45"><?=
+      htmlspecialchars($logEntries, ENT_QUOTES)
+    ?></pre>
+  </div>
+<?php endif; ?>
+
+<h2>Server details</h2>
 <div class="card">
   <table>
     <?php foreach ($server as $label => $value): ?>
@@ -141,17 +241,17 @@ $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'))
 </div>
 
 <div class="note">
-  <strong>Ako to čítať:</strong> ak prejde <em>pekné adresy</em>, všetko je ideálne.
-  Ak prejde len <em>PATH_INFO</em> alebo <em>query parameter</em>, appka bude fungovať tiež –
-  len s mriežkou v adrese (<code>/#/dokument/5</code>). Ak neprejde ani jeden,
-  problém je v <code>.htaccess</code> alebo v tom, že súbory nie sú v koreni webu.
+  <strong>How to read this:</strong> if <em>pretty URLs</em> passes, everything is ideal.
+  If only <em>PATH_INFO</em> or <em>query parameter</em> passes, the app still works –
+  the address just carries a hash (<code>/#/documents/5</code>). If none of them
+  passes, the problem is in <code>.htaccess</code> or the files are not in the web root.
 </div>
 
 <script>
   const base = <?= json_encode($baseUrl, JSON_UNESCAPED_SLASHES) ?>;
 
   const candidates = [
-    ['Pekné adresy (mod_rewrite)', base + '/api/auth/me'],
+    ['Pretty URLs (mod_rewrite)', base + '/api/auth/me'],
     ['PATH_INFO', base + '/index.php/api/auth/me'],
     ['Query parameter', base + '/index.php?_route=/api/auth/me'],
   ];
@@ -162,7 +262,7 @@ $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'))
   (async () => {
     for (const [label, url] of candidates) {
       const row = document.createElement('div');
-      row.textContent = label + ': testujem…';
+      row.textContent = label + ': testing…';
       box.appendChild(row);
 
       let verdict;
@@ -170,21 +270,21 @@ $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'))
         const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
         const text = await response.text();
         let json = null;
-        try { json = JSON.parse(text); } catch (e) { /* nie je JSON */ }
+        try { json = JSON.parse(text); } catch (e) { /* not JSON */ }
 
         if (response.ok && json && 'csrf' in json) {
-          verdict = ['ok', 'funguje'];
+          verdict = ['ok', 'works'];
         } else if (json && json.message) {
-          verdict = ['bad', 'HTTP ' + response.status + ' – ' + json.message];
+          verdict = ['bad', 'HTTP ' + response.status + ' - ' + json.message];
         } else {
-          verdict = ['bad', 'HTTP ' + response.status + ' – odpoveď nie je z MDcabinetu (chybová stránka hostingu)'];
+          verdict = ['bad', 'HTTP ' + response.status + ' - the response is not from MDcabinet (hosting error page)'];
         }
       } catch (error) {
-        verdict = ['bad', 'požiadavka zlyhala: ' + error.message];
+        verdict = ['bad', 'the request failed: ' + error.message];
       }
 
       row.className = verdict[0];
-      row.textContent = label + ' — ' + verdict[1];
+      row.textContent = label + ' - ' + verdict[1];
       row.innerHTML = row.innerHTML + '<br><code>' + url + '</code>';
     }
   })();

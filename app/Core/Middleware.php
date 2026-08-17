@@ -7,7 +7,7 @@ namespace MDcabinet\Core;
 interface Middleware
 {
     /**
-     * Vráť Response na prerušenie reťazca, alebo null na pokračovanie.
+     * Return a Response to short-circuit the chain, or null to continue.
      */
     public function handle(Request $request): ?Response;
 }

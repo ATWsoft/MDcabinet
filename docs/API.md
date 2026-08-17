@@ -17,6 +17,18 @@ X-CSRF-Token: <token z /api/auth/me>
 Ak token vyprší, API vráti `403` s `{"errors":{"csrf":"expired"}}`. Klient v `lib/api.ts`
 si v takom prípade token sám obnoví a request zopakuje.
 
+## Jazyk odpovedí
+
+Klient posiela svoj aktívny jazyk v hlavičke:
+
+```
+X-Locale: sk
+```
+
+Podporované sú `en` (predvolený) a `sk`. Ak hlavička chýba, použije sa
+`Accept-Language`, inak angličtina. Prekladajú sa aj validačné hlášky
+po jednotlivých poliach.
+
 ## Chybové odpovede
 
 ```json
@@ -53,11 +65,11 @@ Po dokončení inštalácie sa oba endpointy samy uzamknú.
 
 | Metóda | Cesta | Telo |
 |---|---|---|
-| `POST` | `/api/auth/register` | `email`, `name`, `password`, `registrationCode?` |
+| `POST` | `/api/auth/register` | `email`, `name`, `password`, `locale?`, `registrationCode?` |
 | `POST` | `/api/auth/login` | `email`, `password` |
 | `POST` | `/api/auth/logout` | – |
-| `GET` | `/api/auth/me` | vracia `user`, `csrf`, `instance` |
-| `PUT` | `/api/auth/profile` | `name`, `avatarColor` |
+| `GET` | `/api/auth/me` | vracia `user` (aj s `locale`), `csrf`, `instance` (aj s `locales`) |
+| `PUT` | `/api/auth/profile` | `name`, `avatarColor?`, `locale?` |
 | `PUT` | `/api/auth/password` | `currentPassword`, `newPassword` |
 
 Prvý registrovaný účet na inštancii dostane rolu `admin` a vzniká bez obmedzení.

@@ -7,6 +7,7 @@ namespace MDcabinet\Http\Controllers;
 use MDcabinet\Core\Auth;
 use MDcabinet\Core\Database;
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Lang;
 use MDcabinet\Core\RateLimiter;
 use MDcabinet\Core\Request;
 use MDcabinet\Core\Response;
@@ -21,14 +22,14 @@ use MDcabinet\Support\Access;
 use MDcabinet\Support\Presenter;
 
 /**
- * Verejné read-only odkazy. Prístup k zamknutému odkazu si držíme v session,
- * takže heslo sa zadáva raz.
+ * Public read-only links. Access to a locked link is remembered in the
+ * session, so the password only has to be entered once.
  */
 final class ShareController
 {
     private const SESSION_UNLOCKED = 'mdc_share_unlocked';
 
-    // ---------------------------------------------------- správa (prihlásený) ---
+    // ------------------------------------------- management (signed-in user) ---
 
     public function index(Request $request): Response
     {
@@ -36,7 +37,7 @@ final class ShareController
         $id   = (int) $request->query('targetId', '0');
 
         if (!in_array($type, ShareLink::TYPES, true) || $id <= 0) {
-            throw HttpException::badRequest('Chýba targetType alebo targetId.');
+            throw HttpException::badRequest(Lang::t('targetType or targetId is missing.'));
         }
 
         Access::shareTarget($type, $id);
@@ -76,13 +77,13 @@ final class ShareController
         $deleted = ShareLink::delete((string) $request->param('token'), Auth::idOrFail());
 
         if ($deleted === 0) {
-            throw HttpException::notFound('Odkaz neexistuje.');
+            throw HttpException::notFound(Lang::t('The link does not exist.'));
         }
 
         return Response::json(['ok' => true]);
     }
 
-    // ------------------------------------------------------ verejný prístup ---
+    // -------------------------------------------------------- public access ---
 
     public function publicShow(Request $request): Response
     {
@@ -112,7 +113,7 @@ final class ShareController
         }
 
         if (!password_verify($request->string('password'), (string) $share['password_hash'])) {
-            throw HttpException::validation(['password' => 'Nesprávne heslo.']);
+            throw HttpException::validation(['password' => Lang::t('Wrong password.')]);
         }
 
         Auth::start();
@@ -123,14 +124,14 @@ final class ShareController
         return Response::json($this->payload($share));
     }
 
-    /** Obsah konkrétneho dokumentu v rámci zdieľaného rozsahu. */
+    /** Content of one document within the shared scope. */
     public function publicDocument(Request $request): Response
     {
         $share      = $this->resolve($request);
         $documentId = $request->paramInt('documentId');
 
         if (!$this->documentInScope($share, $documentId)) {
-            throw HttpException::notFound('Dokument nie je súčasťou tohto odkazu.');
+            throw HttpException::notFound(Lang::t('The document is not part of this link.'));
         }
 
         $document = Document::find($documentId);
@@ -144,17 +145,17 @@ final class ShareController
         ]);
     }
 
-    /** Obrázky vložené v zdieľanom dokumente. */
+    /** Images embedded in a shared document. */
     public function publicFile(Request $request): Response
     {
         $share      = $this->resolve($request);
         $attachment = Attachment::find($request->paramInt('id'));
 
         if ($attachment === null || $attachment['document_id'] === null) {
-            throw HttpException::notFound('Súbor neexistuje.');
+            throw HttpException::notFound(Lang::t('The file does not exist.'));
         }
         if (!$this->documentInScope($share, (int) $attachment['document_id'])) {
-            throw HttpException::notFound('Súbor neexistuje.');
+            throw HttpException::notFound(Lang::t('The file does not exist.'));
         }
 
         return Response::file(
@@ -165,7 +166,7 @@ final class ShareController
         );
     }
 
-    // -------------------------------------------------------------- interné ---
+    // ------------------------------------------------------------- internals ---
 
     /** @return array<string,mixed> */
     private function resolve(Request $request, bool $requireUnlocked = true): array
@@ -174,13 +175,13 @@ final class ShareController
         $share = ShareLink::find($token);
 
         if ($share === null) {
-            throw HttpException::notFound('Odkaz neexistuje alebo bol zrušený.');
+            throw HttpException::notFound(Lang::t('The link does not exist or was revoked.'));
         }
         if (ShareLink::isExpired($share)) {
-            throw new HttpException(410, 'Platnosť odkazu vypršala.');
+            throw new HttpException(410, Lang::t('The link has expired.'));
         }
         if ($requireUnlocked && ShareLink::needsPassword($share) && !$this->isUnlocked($token)) {
-            throw HttpException::unauthorized('Odkaz je chránený heslom.');
+            throw HttpException::unauthorized(Lang::t('The link is password protected.'));
         }
 
         return $share;
@@ -231,7 +232,7 @@ final class ShareController
     {
         $tray = Tray::find($trayId) ?? [];
         if ($tray === []) {
-            throw HttpException::notFound('Šuplík neexistuje.');
+            throw HttpException::notFound(Lang::t('The tray does not exist.'));
         }
 
         $folders   = Folder::allForTray($trayId);
@@ -248,7 +249,7 @@ final class ShareController
     {
         $folder = Folder::find($folderId);
         if ($folder === null) {
-            throw HttpException::notFound('Zložka neexistuje.');
+            throw HttpException::notFound(Lang::t('The folder does not exist.'));
         }
 
         $all       = Folder::allForTray((int) $folder['tray_id']);

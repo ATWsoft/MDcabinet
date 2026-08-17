@@ -6,15 +6,19 @@ import { ChevronRight, Home, Library, Plus } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Cabinet } from '@/lib/types'
 import { cx } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 import { Button, Input, Modal, Spinner, useToast } from '@/components/ui'
 import { CabinetTree, useTreeState } from '@/components/TreeNav'
 
+const PALETTE = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6']
+
 /**
- * Ľavý panel: zoznam skríň, pod každou sa lazy načíta jej strom.
- * Načítavame až po rozbalení – inštancia s desiatkami skríň by inak
- * pri každom otvorení appky ťahala celý obsah.
+ * Left panel: the list of cabinets, each lazily loading its own tree.
+ * Loading happens only after expanding – an instance with dozens of cabinets
+ * would otherwise fetch everything on every page load.
  */
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { t } = useI18n()
   const { open, toggle } = useTreeState()
   const [creating, setCreating] = useState(false)
 
@@ -41,19 +45,19 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           }
         >
           <Home className="h-4 w-4" />
-          Prehľad
+          {t('Overview')}
         </NavLink>
       </nav>
 
       <div className="flex items-center justify-between px-5 pb-1.5">
         <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
           <Library className="h-3.5 w-3.5" />
-          Skrine
+          {t('Cabinets')}
         </h2>
         <button
           onClick={() => setCreating(true)}
-          title="Nová skriňa"
-          aria-label="Nová skriňa"
+          title={t('New cabinet')}
+          aria-label={t('New cabinet')}
           className="rounded p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800 dark:hover:text-white"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -67,7 +71,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         ) : cabinets.length === 0 ? (
           <p className="px-3 py-4 text-[13px] text-ink-400 dark:text-ink-500">
-            Zatiaľ nemáš žiadnu skriňu. Vytvor prvú cez <strong>+</strong> vyššie.
+            {t('No cabinets yet. Create your first one with the + above.')}
           </p>
         ) : (
           <ul className="space-y-0.5">
@@ -101,6 +105,8 @@ function CabinetSection({
   onTreeToggle: (key: string) => void
   onNavigate?: () => void
 }) {
+  const { t } = useI18n()
+
   const { data, isLoading } = useQuery({
     queryKey: ['cabinet', cabinet.id],
     queryFn: () => api.cabinets.show(cabinet.id),
@@ -113,7 +119,7 @@ function CabinetSection({
         <button
           onClick={onToggle}
           aria-expanded={expanded}
-          aria-label={expanded ? 'Zbaliť skriňu' : 'Rozbaliť skriňu'}
+          aria-label={expanded ? t('Collapse cabinet') : t('Expand cabinet')}
           className="rounded p-0.5 text-ink-400 hover:text-ink-700 dark:hover:text-ink-200"
         >
           <ChevronRight className={cx('h-3.5 w-3.5 transition-transform', expanded && 'rotate-90')} />
@@ -155,8 +161,9 @@ function CabinetSection({
 }
 
 function NewCabinetModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
-  const [color, setColor] = useState('#6366f1')
+  const [color, setColor] = useState(PALETTE[0])
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const toast = useToast()
@@ -166,7 +173,7 @@ function NewCabinetModal({ open, onClose }: { open: boolean; onClose: () => void
     onSuccess: async ({ cabinet }) => {
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success(`Skriňa „${cabinet.name}“ je vytvorená.`)
+      toast.success(t('Cabinet “{name}” created.', { name: cabinet.name }))
       setName('')
       onClose()
       navigate(`/cabinets/${cabinet.id}`)
@@ -174,24 +181,22 @@ function NewCabinetModal({ open, onClose }: { open: boolean; onClose: () => void
     onError: (error: Error) => toast.error(error.message),
   })
 
-  const palette = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6']
-
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Nová skriňa"
-      description="Skriňa je najvyššia úroveň – zoskupuje šuplíky s dokumentmi."
+      title={t('New cabinet')}
+      description={t('A cabinet is the top level – it groups trays with documents.')}
       footer={
         <>
-          <Button onClick={onClose}>Zrušiť</Button>
+          <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button
             variant="primary"
             loading={mutation.isPending}
             disabled={name.trim() === ''}
             onClick={() => mutation.mutate()}
           >
-            Vytvoriť
+            {t('Create')}
           </Button>
         </>
       }
@@ -204,21 +209,23 @@ function NewCabinetModal({ open, onClose }: { open: boolean; onClose: () => void
         }}
       >
         <Input
-          label="Názov"
+          label={t('Name')}
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="napr. Firemná dokumentácia"
+          placeholder={t('e.g. Company documentation')}
           autoFocus
         />
         <div>
-          <span className="mb-2 block text-sm font-medium text-ink-700 dark:text-ink-200">Farba</span>
+          <span className="mb-2 block text-sm font-medium text-ink-700 dark:text-ink-200">
+            {t('Colour')}
+          </span>
           <div className="flex flex-wrap gap-2">
-            {palette.map((value) => (
+            {PALETTE.map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setColor(value)}
-                aria-label={`Farba ${value}`}
+                aria-label={t('Colour {value}', { value })}
                 className={cx(
                   'h-7 w-7 rounded-lg ring-offset-2 transition dark:ring-offset-ink-900',
                   color === value ? 'ring-2 ring-ink-400' : 'hover:scale-110',

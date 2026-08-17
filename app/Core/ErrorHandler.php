@@ -7,8 +7,8 @@ namespace MDcabinet\Core;
 use Throwable;
 
 /**
- * Chyby nikdy nekončia bielou stránkou – buď JSON (pre /api), alebo krátka HTML hláška.
- * Detaily idú do storage/logs/app-YYYY-MM-DD.log.
+ * Errors never end in a blank page: JSON for /api, a short HTML notice
+ * otherwise. Details go to storage/logs/app-YYYY-MM-DD.log.
  */
 final class ErrorHandler
 {
@@ -20,11 +20,24 @@ final class ErrorHandler
         ini_set('display_errors', $debug ? '1' : '0');
         ini_set('log_errors', '1');
 
-        set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+        set_error_handler(static function (int $severity, string $message, string $file, int $line) use ($debug): bool {
             if (!(error_reporting() & $severity)) {
                 return false;
             }
-            throw new \ErrorException($message, 0, $severity, $file, $line);
+
+            // Strict during development: every warning becomes an exception so
+            // that bugs surface immediately. In production a harmless warning
+            // (an unwritable session path, a missing optional file) must not
+            // turn a working request into a blank 500 – it is logged instead.
+            $fatal = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR];
+
+            if ($debug || in_array($severity, $fatal, true)) {
+                throw new \ErrorException($message, 0, $severity, $file, $line);
+            }
+
+            self::write(sprintf('WARNING (%d): %s in %s:%d', $severity, $message, $file, $line));
+
+            return true;
         });
 
         set_exception_handler([self::class, 'handle']);
@@ -58,7 +71,7 @@ final class ErrorHandler
         $payload = [
             'error'   => true,
             'message' => $status >= 500 && !Config::isDebug()
-                ? 'Nastala neočakávaná chyba na serveri.'
+                ? Lang::t('An unexpected server error occurred.')
                 : $e->getMessage(),
         ];
 
@@ -77,32 +90,42 @@ final class ErrorHandler
             return;
         }
 
+        $title = Lang::t('Error {status}', ['status' => $status]);
+
         http_response_code($status);
         header('Content-Type: text/html; charset=utf-8');
-        echo '<!doctype html><meta charset="utf-8"><title>Chyba ' . $status . '</title>'
+        echo '<!doctype html><meta charset="utf-8"><title>' . htmlspecialchars($title, ENT_QUOTES) . '</title>'
             . '<style>body{font:16px/1.6 system-ui,sans-serif;max-width:40rem;margin:15vh auto;padding:0 1.5rem;color:#1f2430}'
             . 'code{background:#f1f3f7;padding:.15em .4em;border-radius:.25em}</style>'
-            . '<h1>Chyba ' . $status . '</h1><p>' . htmlspecialchars((string) $payload['message'], ENT_QUOTES) . '</p>';
+            . '<h1>' . htmlspecialchars($title, ENT_QUOTES) . '</h1>'
+            . '<p>' . htmlspecialchars((string) $payload['message'], ENT_QUOTES) . '</p>';
     }
 
     public static function log(Throwable $e): void
+    {
+        self::write(sprintf(
+            "%s: %s in %s:%d\n%s",
+            get_class($e),
+            $e->getMessage(),
+            $e->getFile(),
+            $e->getLine(),
+            $e->getTraceAsString()
+        ));
+    }
+
+    /** Appends one entry to storage/logs/app-YYYY-MM-DD.log. */
+    private static function write(string $message): void
     {
         $dir = MDC_STORAGE . '/logs';
         if (!is_dir($dir)) {
             @mkdir($dir, 0775, true);
         }
 
-        $line = sprintf(
-            "[%s] %s: %s in %s:%d\n%s\n\n",
-            date('Y-m-d H:i:s'),
-            get_class($e),
-            $e->getMessage(),
-            $e->getFile(),
-            $e->getLine(),
-            $e->getTraceAsString()
+        @file_put_contents(
+            $dir . '/app-' . date('Y-m-d') . '.log',
+            sprintf("[%s] %s\n\n", date('Y-m-d H:i:s'), $message),
+            FILE_APPEND | LOCK_EX
         );
-
-        @file_put_contents($dir . '/app-' . date('Y-m-d') . '.log', $line, FILE_APPEND | LOCK_EX);
     }
 
     private static function wantsJson(): bool

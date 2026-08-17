@@ -6,6 +6,7 @@ namespace MDcabinet\Http\Controllers;
 
 use MDcabinet\Core\Auth;
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Lang;
 use MDcabinet\Core\Request;
 use MDcabinet\Core\Response;
 use MDcabinet\Models\Attachment;
@@ -13,14 +14,14 @@ use MDcabinet\Support\Access;
 
 final class FileController
 {
-    /** Upload z editora (drag & drop, vloženie zo schránky, tlačidlo). */
+    /** Upload from the editor (drag & drop, paste, toolbar button). */
     public function upload(Request $request): Response
     {
         $userId = Auth::idOrFail();
 
         $file = $_FILES['file'] ?? null;
         if (!is_array($file)) {
-            throw HttpException::badRequest('Chýba súbor v poli "file".');
+            throw HttpException::badRequest(Lang::t('The "file" field is missing.'));
         }
 
         $documentId = $request->int('documentId') ?: null;
@@ -34,27 +35,27 @@ final class FileController
     }
 
     /**
-     * Servovanie súboru. Uploady ležia mimo webrootu, takže ich vydáva PHP –
-     * vďaka tomu sa dá kontrolovať prístup a nedá sa spustiť podstrčený skript.
+     * Serves a file. Uploads live outside the web root and are handed out by
+     * PHP, so access can be checked and a planted script can never execute.
      */
     public function serve(Request $request): Response
     {
         $attachment = Attachment::find($request->paramInt('id'));
         if ($attachment === null) {
-            throw HttpException::notFound('Súbor neexistuje.');
+            throw HttpException::notFound(Lang::t('The file does not exist.'));
         }
 
-        // Prílohu vidí jej autor alebo ktokoľvek s prístupom k dokumentu.
+        // The author sees the attachment, as does anyone who can read the document.
         if ($attachment['document_id'] !== null) {
             Access::document((int) $attachment['document_id']);
         } elseif ((int) $attachment['user_id'] !== Auth::idOrFail()) {
-            throw HttpException::notFound('Súbor neexistuje.');
+            throw HttpException::notFound(Lang::t('The file does not exist.'));
         }
 
         $path = Attachment::absolutePath((string) $attachment['disk_path']);
         $mime = (string) $attachment['mime'];
 
-        // SVG servujeme na stiahnutie – inline SVG je vektor pre XSS.
+        // SVG is sent as a download: inline SVG is a common XSS vector.
         $inline = $mime !== 'image/svg+xml';
 
         return Response::file($path, $mime, (string) $attachment['original_name'], $inline);
@@ -64,7 +65,7 @@ final class FileController
     {
         $attachment = Attachment::find($request->paramInt('id'));
         if ($attachment === null) {
-            throw HttpException::notFound('Súbor neexistuje.');
+            throw HttpException::notFound(Lang::t('The file does not exist.'));
         }
 
         if ((int) $attachment['user_id'] !== Auth::idOrFail() && !Auth::isAdmin()) {

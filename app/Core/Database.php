@@ -9,8 +9,8 @@ use PDOException;
 use PDOStatement;
 
 /**
- * Tenká vrstva nad PDO – jedno spojenie na request, pripravené dopyty,
- * pár skratiek (`fetch`, `fetchAll`, `insert`, `update`, `delete`).
+ * Thin layer over PDO: one connection per request, prepared statements and
+ * a few shortcuts (`fetch`, `fetchAll`, `insert`, `update`, `delete`).
  */
 final class Database
 {
@@ -43,7 +43,10 @@ final class Database
                 ]
             );
         } catch (PDOException $e) {
-            throw new HttpException(500, 'Nepodarilo sa pripojiť k databáze: ' . $e->getMessage());
+            throw new HttpException(500, Lang::t(
+                'Could not connect to the database: {error}',
+                ['error' => $e->getMessage()]
+            ));
         }
 
         return self::$pdo;

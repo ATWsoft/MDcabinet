@@ -1,19 +1,23 @@
 /**
- * Editorové príkazy nad CodeMirror – obalenie výberu, prefixy riadkov,
- * vkladanie odkazov a obrázkov. Všetko cez transakcie, takže undo funguje.
+ * Editor commands on top of CodeMirror – wrapping the selection, line
+ * prefixes, inserting links and images. Everything goes through transactions,
+ * so undo keeps working.
+ *
+ * Any text that ends up inside the document is passed in by the caller, which
+ * has access to the translations.
  */
 
 import { EditorSelection } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 
-/** Obalí výber značkou (**tučné**, *kurzíva*, `kód`…). Druhé volanie ju odstráni. */
+/** Wraps the selection in a marker (**bold**, *italic*, `code`). Toggles off on a second call. */
 export function wrapSelection(view: EditorView, before: string, after = before): void {
   const { state } = view
 
   const transaction = state.changeByRange((range) => {
     const selected = state.sliceDoc(range.from, range.to)
 
-    // Už je výber obalený? Potom značku odoberieme (správanie ako toggle).
+    // Already wrapped? Then remove the markers (toggle behaviour).
     const outerFrom = range.from - before.length
     const outerTo = range.to + after.length
     const alreadyWrapped =
@@ -45,7 +49,7 @@ export function wrapSelection(view: EditorView, before: string, after = before):
   view.focus()
 }
 
-/** Pridá/odoberie prefix na začiatku každého vybraného riadku (#, >, -, 1.). */
+/** Adds or removes a prefix on every selected line (#, >, -, 1.). */
 export function toggleLinePrefix(view: EditorView, prefix: string, ordered = false): void {
   const { state } = view
   const changes: { from: number; to: number; insert: string }[] = []
@@ -73,7 +77,7 @@ export function toggleLinePrefix(view: EditorView, prefix: string, ordered = fal
   view.focus()
 }
 
-/** Nastaví úroveň nadpisu na aktuálnom riadku (0 = odstrániť). */
+/** Sets the heading level on the current line (0 = remove it). */
 export function setHeading(view: EditorView, level: number): void {
   const { state } = view
   const changes: { from: number; to: number; insert: string }[] = []
@@ -94,7 +98,7 @@ export function setHeading(view: EditorView, level: number): void {
   view.focus()
 }
 
-/** Vloží text na pozíciu kurzora (odkaz, obrázok, tabuľka…). */
+/** Inserts text at the cursor (link, image, table…). */
 export function insertAtCursor(view: EditorView, text: string, selectOffset?: [number, number]): void {
   const { state } = view
   const range = state.selection.main
@@ -112,11 +116,14 @@ export function insertAtCursor(view: EditorView, text: string, selectOffset?: [n
   view.focus()
 }
 
-/** Odkaz: z výberu spraví text odkazu, kurzor skočí do URL. */
-export function insertLink(view: EditorView, url = ''): void {
+/**
+ * Link: the selection becomes the link text and the cursor jumps into the URL.
+ * `placeholder` is used when nothing is selected.
+ */
+export function insertLink(view: EditorView, placeholder: string, url = ''): void {
   const { state } = view
   const range = state.selection.main
-  const selected = state.sliceDoc(range.from, range.to) || 'text odkazu'
+  const selected = state.sliceDoc(range.from, range.to) || placeholder
   const markdown = `[${selected}](${url})`
 
   view.dispatch(
@@ -139,10 +146,13 @@ export function insertImage(view: EditorView, url: string, alt = ''): void {
   insertAtCursor(view, `\n![${alt}](${url})\n`)
 }
 
-export function insertTable(view: EditorView): void {
+/** @param labels [first column, second column, sample value] */
+export function insertTable(view: EditorView, labels: [string, string, string]): void {
+  const [columnA, columnB, value] = labels
+
   insertAtCursor(
     view,
-    '\n| Stĺpec A | Stĺpec B |\n| --- | --- |\n| hodnota | hodnota |\n',
+    `\n| ${columnA} | ${columnB} |\n| --- | --- |\n| ${value} | ${value} |\n`,
   )
 }
 

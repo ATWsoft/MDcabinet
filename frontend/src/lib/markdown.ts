@@ -1,9 +1,9 @@
 /**
- * Markdown → bezpečné HTML.
+ * Markdown to safe HTML.
  *
- * markdown-it renderuje, DOMPurify sanitizuje. Poradie je dôležité:
- * v Markdowne sa dá napísať surové HTML, takže bez sanitizácie by
- * zdieľaný dokument bol otvorená brána na XSS.
+ * markdown-it renders, DOMPurify sanitizes. The order matters: Markdown may
+ * contain raw HTML, so without sanitizing, a shared document would be an
+ * open door for XSS.
  */
 
 import MarkdownIt from 'markdown-it'
@@ -12,8 +12,8 @@ import taskLists from 'markdown-it-task-lists'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/core'
 
-// Registrujeme len jazyky, ktoré v dokumentácii reálne vídať – celý balík
-// highlight.js váži cez 900 kB, takýto výber pár desiatok.
+// Only the languages that actually show up in documentation are
+// registered: the full highlight.js bundle weighs over 900 kB.
 import bash from 'highlight.js/lib/languages/bash'
 import csharp from 'highlight.js/lib/languages/csharp'
 import css from 'highlight.js/lib/languages/css'
@@ -51,8 +51,8 @@ hljs.registerAliases(['cs', 'c#'], { languageName: 'csharp' })
 hljs.registerAliases(['md'], { languageName: 'markdown' })
 hljs.registerAliases(['toml', 'conf'], { languageName: 'ini' })
 
-// Anotácia typu je tu potrebná: `highlight` odkazuje na `md` a TypeScript
-// by inak nedokázal odvodiť typ z vlastného inicializátora.
+// The type annotation is required: `highlight` refers to `md`, and
+// TypeScript cannot infer a type from its own initializer.
 const md: MarkdownIt = new MarkdownIt({
   html: true,
   linkify: true,
@@ -63,7 +63,7 @@ const md: MarkdownIt = new MarkdownIt({
       try {
         return hljs.highlight(code, { language, ignoreIllegals: true }).value
       } catch {
-        /* padáme na escapovaný text nižšie */
+        /* fall through to the escaped text below */
       }
     }
     return md.utils.escapeHtml(code)
@@ -83,12 +83,12 @@ md.use(anchor, {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'sekcia',
+      .replace(/^-+|-+$/g, '') || 'section',
 })
 
 md.use(taskLists, { enabled: true, label: true })
 
-// Externé odkazy otvárame v novom okne a bez odovzdania referreru.
+// External links open in a new tab and do not leak the referrer.
 type RenderRule = NonNullable<typeof md.renderer.rules.link_open>
 
 const defaultLinkRenderer: RenderRule =
@@ -104,7 +104,7 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   return defaultLinkRenderer(tokens, idx, options, env, self)
 }
 
-// Cieľ odkazu si necháme prejsť len cez bezpečné schémy.
+// Keep link targets restricted to safe schemes.
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
     node.setAttribute('rel', 'noopener noreferrer')
@@ -126,7 +126,7 @@ export interface HeadingEntry {
   slug: string
 }
 
-/** Obsah dokumentu (table of contents) pre pravý panel v editore. */
+/** Table of contents for the editor side panel. */
 export function extractHeadings(source: string): HeadingEntry[] {
   const headings: HeadingEntry[] = []
   let insideFence = false
@@ -151,7 +151,7 @@ export function extractHeadings(source: string): HeadingEntry[] {
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '')
           .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '') || 'sekcia',
+          .replace(/^-+|-+$/g, '') || 'section',
     })
   }
 

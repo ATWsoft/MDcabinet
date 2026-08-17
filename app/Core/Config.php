@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace MDcabinet\Core;
 
 /**
- * Konfigurácia: config/config.php  +  prebitie cez MDC_* env premenné.
+ * Configuration: config/config.php on top of the defaults, with MDC_* env
+ * variables taking precedence (used by docker-compose during development).
  */
 final class Config
 {
@@ -27,14 +28,14 @@ final class Config
 
         self::$data = self::merge($defaults, is_array($local) ? $local : []);
 
-        // Musí byť nastavené pred applyEnv(): to volá set(), ktorý si inak
-        // znova vyžiada load() a skončilo by to nekonečnou rekurziou.
+        // Must be set before applyEnv(): that calls set(), which would ask
+        // for load() again and recurse forever.
         self::$loaded = true;
 
         self::applyEnv();
     }
 
-    /** Existuje použiteľná konfigurácia (t.j. prebehol setup)? */
+    /** Is there a usable configuration (i.e. has setup been completed)? */
     public static function isInstalled(): bool
     {
         return is_file(MDC_ROOT . '/config/config.php')
@@ -42,7 +43,7 @@ final class Config
     }
 
     /**
-     * Čítanie hodnoty bodkovou notáciou: Config::get('db.host').
+     * Reads a value using dot notation: Config::get('db.host').
      */
     public static function get(string $key, mixed $default = null): mixed
     {
@@ -79,7 +80,7 @@ final class Config
         return (bool) self::get('app.debug', false);
     }
 
-    /** Základná URL aplikácie bez koncovej lomky. */
+    /** Base URL of the application without a trailing slash. */
     public static function url(): string
     {
         $configured = (string) self::get('app.url', '');
@@ -96,8 +97,8 @@ final class Config
     }
 
     /**
-     * Podadresár, v ktorom appka beží (napr. "/docs" pri domene s podpriečinkom).
-     * Vracia "" alebo "/nieco".
+     * The sub-directory the app runs in (e.g. "/docs" when installed into a
+     * folder). Returns either "" or "/something".
      */
     public static function basePath(): string
     {
@@ -112,7 +113,7 @@ final class Config
         return $base = ($dir === '/' ? '' : $dir);
     }
 
-    /** Env premenné majú prednosť – používa ich docker-compose aj setup. */
+    /** Environment variables win – used by docker-compose and by setup. */
     private static function applyEnv(): void
     {
         $map = [

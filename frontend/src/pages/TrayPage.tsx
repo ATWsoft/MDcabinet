@@ -8,13 +8,15 @@ import {
 
 import { api } from '@/lib/api'
 import type { Folder } from '@/lib/types'
-import { timeAgo } from '@/lib/utils'
+import { cx, timeAgo } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 import {
   Button, ConfirmDialog, EmptyState, Input, Modal, PageLoader, Textarea, useToast,
 } from '@/components/ui'
 import { ShareDialog } from '@/components/ShareDialog'
 
 export function TrayPage() {
+  const { t } = useI18n()
   const { id } = useParams()
   const trayId = Number(id)
   const navigate = useNavigate()
@@ -38,7 +40,7 @@ export function TrayPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
       if (data) await queryClient.invalidateQueries({ queryKey: ['cabinet', data.tray.cabinetId] })
-      toast.info('Šuplík bol zmazaný.')
+      toast.info(t('The tray was deleted.'))
       navigate(data ? `/cabinets/${data.tray.cabinetId}` : '/')
     },
     onError: (error: Error) => toast.error(error.message),
@@ -48,7 +50,10 @@ export function TrayPage() {
   if (isError || !data) {
     return (
       <div className="p-8">
-        <EmptyState title="Šuplík sa nenašiel" description="Možno bol zmazaný alebo patrí inému účtu." />
+        <EmptyState
+          title={t('Tray not found')}
+          description={t('It may have been deleted or it belongs to another account.')}
+        />
       </div>
     )
   }
@@ -63,7 +68,7 @@ export function TrayPage() {
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
         <nav className="mb-4 flex items-center gap-1.5 text-[13px] text-ink-500 dark:text-ink-400">
           <Link to={`/cabinets/${tray.cabinetId}`} className="hover:text-ink-800 hover:underline dark:hover:text-white">
-            Skriňa
+            {t('Cabinet')}
           </Link>
           <ChevronRight className="h-3.5 w-3.5" />
           <span className="text-ink-700 dark:text-ink-200">{tray.name}</span>
@@ -81,26 +86,26 @@ export function TrayPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Button icon={<Pencil className="h-4 w-4" />} onClick={() => setEditing(true)}>
-              Upraviť
+              {t('Edit')}
             </Button>
             <Button icon={<Share2 className="h-4 w-4" />} onClick={() => setSharing(true)}>
-              Zdieľať
+              {t('Share')}
             </Button>
             <Button
               variant="ghost"
               icon={<Trash2 className="h-4 w-4" />}
               onClick={() => setDeleting(true)}
-              aria-label="Zmazať šuplík"
+              aria-label={t('Delete tray')}
             />
             <Button icon={<FolderPlus className="h-4 w-4" />} onClick={() => setNewFolderParent(null)}>
-              Zložka
+              {t('Folder')}
             </Button>
             <Button
               variant="primary"
               icon={<FilePlus className="h-4 w-4" />}
               onClick={() => setNewDocumentFolder(null)}
             >
-              Nový dokument
+              {t('New document')}
             </Button>
           </div>
         </header>
@@ -108,15 +113,15 @@ export function TrayPage() {
         {isEmpty ? (
           <EmptyState
             icon={<FileText className="h-10 w-10" />}
-            title="Šuplík je prázdny"
-            description="Vytvor prvý dokument alebo si obsah najskôr rozčleň do zložiek."
+            title={t('This tray is empty')}
+            description={t('Create the first document, or split the content into folders first.')}
             action={
               <Button
                 variant="primary"
                 icon={<FilePlus className="h-4 w-4" />}
                 onClick={() => setNewDocumentFolder(null)}
               >
-                Nový dokument
+                {t('New document')}
               </Button>
             }
           />
@@ -165,8 +170,8 @@ export function TrayPage() {
 
       <ConfirmDialog
         open={deleting}
-        title="Zmazať šuplík?"
-        description={`„${tray.name}“ aj so všetkými zložkami a dokumentmi.`}
+        title={t('Delete this tray?')}
+        description={t('“{name}” with all its folders and documents.', { name: tray.name })}
         onCancel={() => setDeleting(false)}
         onConfirm={() => remove.mutate()}
         loading={remove.isPending}
@@ -175,7 +180,7 @@ export function TrayPage() {
   )
 }
 
-/* ------------------------------------------------------------- riadky --- */
+/* --------------------------------------------------------------- rows --- */
 
 function FolderRow({
   folder, depth, trayId, onAddFolder, onAddDocument,
@@ -186,6 +191,7 @@ function FolderRow({
   onAddFolder: (parentId: number) => void
   onAddDocument: (folderId: number) => void
 }) {
+  const { t, tn } = useI18n()
   const [open, setOpen] = useState(depth === 0)
   const [renaming, setRenaming] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -197,7 +203,7 @@ function FolderRow({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tray', trayId] })
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
-      toast.info('Zložka bola zmazaná.')
+      toast.info(t('The folder was deleted.'))
       setDeleting(false)
     },
     onError: (error: Error) => toast.error(error.message),
@@ -217,27 +223,25 @@ function FolderRow({
           aria-expanded={open}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
-          <ChevronRight
-            className={`h-4 w-4 shrink-0 text-ink-400 transition-transform ${open ? 'rotate-90' : ''}`}
-          />
+          <ChevronRight className={cx('h-4 w-4 shrink-0 text-ink-400 transition-transform', open && 'rotate-90')} />
           <FolderIcon className="h-4 w-4 shrink-0 text-amber-500" />
           <span className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">{folder.name}</span>
           <span className="shrink-0 text-[12px] text-ink-400">
-            {documents.length > 0 && `${documents.length} dok.`}
+            {documents.length > 0 && tn(documents.length, '{count} doc', '{count} docs')}
           </span>
         </button>
 
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-          <IconButton label="Nový dokument v zložke" onClick={() => onAddDocument(folder.id)}>
+          <IconButton label={t('New document in this folder')} onClick={() => onAddDocument(folder.id)}>
             <FilePlus className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton label="Podzložka" onClick={() => onAddFolder(folder.id)}>
+          <IconButton label={t('Subfolder')} onClick={() => onAddFolder(folder.id)}>
             <FolderPlus className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton label="Premenovať" onClick={() => setRenaming(true)}>
+          <IconButton label={t('Rename')} onClick={() => setRenaming(true)}>
             <Pencil className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton label="Zmazať zložku" onClick={() => setDeleting(true)} danger>
+          <IconButton label={t('Delete folder')} onClick={() => setDeleting(true)} danger>
             <Trash2 className="h-3.5 w-3.5" />
           </IconButton>
         </div>
@@ -263,7 +267,7 @@ function FolderRow({
               className="px-2 py-1.5 text-[13px] italic text-ink-400 dark:text-ink-500"
               style={{ paddingLeft: `${(depth + 1) * 20 + 30}px` }}
             >
-              zložka je prázdna
+              {t('this folder is empty')}
             </p>
           )}
         </div>
@@ -278,8 +282,8 @@ function FolderRow({
 
       <ConfirmDialog
         open={deleting}
-        title="Zmazať zložku?"
-        description={`„${folder.name}“ aj s obsahom.`}
+        title={t('Delete this folder?')}
+        description={t('“{name}” with everything inside.', { name: folder.name })}
         onCancel={() => setDeleting(false)}
         onConfirm={() => remove.mutate()}
         loading={remove.isPending}
@@ -288,7 +292,12 @@ function FolderRow({
   )
 }
 
-function DocumentRow({ doc, depth }: { doc: { id: number; title: string; excerpt: string; updatedAt: string | null }; depth: number }) {
+function DocumentRow({
+  doc, depth,
+}: {
+  doc: { id: number; title: string; excerpt: string; updatedAt: string | null }
+  depth: number
+}) {
   return (
     <Link
       to={`/documents/${doc.id}`}
@@ -321,19 +330,19 @@ function IconButton({
       title={label}
       aria-label={label}
       onClick={onClick}
-      className={
-        'rounded-md p-1.5 text-ink-400 transition-colors ' +
-        (danger
+      className={cx(
+        'rounded-md p-1.5 text-ink-400 transition-colors',
+        danger
           ? 'hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30'
-          : 'hover:bg-ink-200 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-white')
-      }
+          : 'hover:bg-ink-200 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-white',
+      )}
     >
       {children}
     </button>
   )
 }
 
-/* -------------------------------------------------------------- modály --- */
+/* -------------------------------------------------------------- modals --- */
 
 function FolderModal({
   open, onClose, trayId, parentId,
@@ -343,6 +352,7 @@ function FolderModal({
   trayId: number
   parentId: number | null
 }) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -352,7 +362,7 @@ function FolderModal({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tray', trayId] })
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
-      toast.success('Zložka je vytvorená.')
+      toast.success(t('The folder was created.'))
       setName('')
       onClose()
     },
@@ -363,24 +373,24 @@ function FolderModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={parentId ? 'Nová podzložka' : 'Nová zložka'}
+      title={parentId ? t('New subfolder') : t('New folder')}
       size="sm"
       footer={
         <>
-          <Button onClick={onClose}>Zrušiť</Button>
+          <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button
             variant="primary"
             loading={mutation.isPending}
             disabled={name.trim() === ''}
             onClick={() => mutation.mutate()}
           >
-            Vytvoriť
+            {t('Create')}
           </Button>
         </>
       }
     >
       <Input
-        label="Názov zložky"
+        label={t('Folder name')}
         value={name}
         onChange={(event) => setName(event.target.value)}
         onKeyDown={(event) => {
@@ -400,6 +410,7 @@ function RenameFolderModal({
   folder: Folder
   trayId: number
 }) {
+  const { t } = useI18n()
   const [name, setName] = useState(folder.name)
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -409,7 +420,7 @@ function RenameFolderModal({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tray', trayId] })
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
-      toast.success('Zložka je premenovaná.')
+      toast.success(t('The folder was renamed.'))
       onClose()
     },
     onError: (error: Error) => toast.error(error.message),
@@ -419,18 +430,18 @@ function RenameFolderModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Premenovať zložku"
+      title={t('Rename folder')}
       size="sm"
       footer={
         <>
-          <Button onClick={onClose}>Zrušiť</Button>
+          <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={mutation.isPending} onClick={() => mutation.mutate()}>
-            Uložiť
+            {t('Save')}
           </Button>
         </>
       }
     >
-      <Input label="Názov" value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+      <Input label={t('Name')} value={name} onChange={(event) => setName(event.target.value)} autoFocus />
     </Modal>
   )
 }
@@ -443,6 +454,7 @@ function DocumentModal({
   trayId: number
   folderId: number | null
 }) {
+  const { t } = useI18n()
   const [title, setTitle] = useState('')
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -471,30 +483,30 @@ function DocumentModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Nový dokument"
+      title={t('New document')}
       size="sm"
       footer={
         <>
-          <Button onClick={onClose}>Zrušiť</Button>
+          <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button
             variant="primary"
             loading={mutation.isPending}
             disabled={title.trim() === ''}
             onClick={() => mutation.mutate()}
           >
-            Vytvoriť a otvoriť
+            {t('Create and open')}
           </Button>
         </>
       }
     >
       <Input
-        label="Názov dokumentu"
+        label={t('Document title')}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && title.trim() !== '') mutation.mutate()
         }}
-        placeholder="napr. Onboarding nového kolegu"
+        placeholder={t('e.g. Onboarding a new colleague')}
         autoFocus
       />
     </Modal>
@@ -508,6 +520,7 @@ function TrayEditModal({
   onClose: () => void
   tray: { id: number; name: string; description: string | null; cabinetId: number }
 }) {
+  const { t } = useI18n()
   const [name, setName] = useState(tray.name)
   const [description, setDescription] = useState(tray.description ?? '')
   const queryClient = useQueryClient()
@@ -519,7 +532,7 @@ function TrayEditModal({
       await queryClient.invalidateQueries({ queryKey: ['tray', tray.id] })
       await queryClient.invalidateQueries({ queryKey: ['cabinet', tray.cabinetId] })
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
-      toast.success('Zmeny sú uložené.')
+      toast.success(t('Changes saved.'))
       onClose()
     },
     onError: (error: Error) => toast.error(error.message),
@@ -529,20 +542,20 @@ function TrayEditModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Upraviť šuplík"
+      title={t('Edit tray')}
       footer={
         <>
-          <Button onClick={onClose}>Zrušiť</Button>
+          <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={mutation.isPending} onClick={() => mutation.mutate()}>
-            Uložiť
+            {t('Save')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input label="Názov" value={name} onChange={(event) => setName(event.target.value)} />
+        <Input label={t('Name')} value={name} onChange={(event) => setName(event.target.value)} />
         <Textarea
-          label="Popis"
+          label={t('Description')}
           rows={3}
           value={description}
           onChange={(event) => setDescription(event.target.value)}

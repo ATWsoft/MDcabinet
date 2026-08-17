@@ -1,28 +1,28 @@
 <?php
 /**
- * MDcabinet – konfigurácia.
+ * MDcabinet configuration.
  *
- * Skopíruj tento súbor ako `config/config.php` a vyplň údaje k databáze.
- * `config/config.php` je v .gitignore, takže sa nikdy nedostane do repozitára.
+ * Copy this file to `config/config.php` and fill in the database details.
+ * `config/config.php` is in .gitignore, so it never reaches the repository.
  *
- * Každá hodnota sa dá prebiť aj environment premennou (MDC_*), čo využíva
- * docker-compose pri lokálnom vývoji.
+ * Every value can also be overridden by an environment variable (MDC_*),
+ * which is what docker-compose uses during local development.
  */
 
 return [
-    // ---------------------------------------------------------------- app ---
+    // ----------------------------------------------------------------- app ---
     'app' => [
         'name'  => 'MDcabinet',
         // 'local' | 'production'
         'env'   => 'production',
-        // Pri production nechaj false – chyby sa logujú do storage/logs.
+        // Keep this false in production – errors are logged to storage/logs.
         'debug' => false,
-        // Absolútna URL aplikácie bez lomky na konci, napr. https://docs.mojadomena.sk
-        // Prázdne = odvodí sa automaticky z requestu.
+        // Absolute app URL without a trailing slash, e.g. https://docs.example.com
+        // Empty = derived automatically from the request.
         'url'   => '',
     ],
 
-    // --------------------------------------------------------------- data ---
+    // ------------------------------------------------------------------ db ---
     'db' => [
         'host'    => 'localhost',
         'port'    => 3306,
@@ -32,24 +32,25 @@ return [
         'charset' => 'utf8mb4',
     ],
 
-    // ---------------------------------------------------------- bezpečnosť ---
+    // ------------------------------------------------------------ security ---
     'security' => [
-        // Náhodný reťazec, min. 32 znakov. Vygeneruj napr. cez /setup.
+        // Random string, at least 32 characters. /setup generates one for you.
         'app_key'          => '',
         'session_name'     => 'mdcabinet_session',
-        // Dĺžka prihlásenia v sekundách (default 30 dní).
+        // How long a sign-in lasts, in seconds (default 30 days).
         'session_lifetime' => 60 * 60 * 24 * 30,
-        // Predvoľby registrácie pre čerstvú inštaláciu. Po prvom uložení
-        // v aplikácii (Nastavenia → Registrácia) platia hodnoty z databázy.
+
+        // Registration defaults for a fresh installation. Once saved in the
+        // app (Account settings → Registration) the database values apply.
         //
-        // Vypni, ak chceš uzavretú inštanciu bez samoregistrácie.
+        // Turn this off for a closed instance without self-registration.
         'allow_registration' => true,
-        // Kód, ktorý musí uchádzač zadať pri registrácii. Prázdne = ktokoľvek
-        // sa môže zaregistrovať (na verejnej doméne to skôr či neskôr nájdu boti).
+        // Code an applicant must supply when registering. Empty means anyone
+        // can register, which bots will eventually find on a public domain.
         'registration_code'  => '',
     ],
 
-    // -------------------------------------------------------------- upload ---
+    // ------------------------------------------------------------- uploads ---
     'uploads' => [
         'max_size'   => 16 * 1024 * 1024, // 16 MB
         'mime_allow' => [

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace MDcabinet\Http\Controllers;
 
 use MDcabinet\Core\Auth;
+use MDcabinet\Core\Database;
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Lang;
+use MDcabinet\Core\Migrator;
 use MDcabinet\Core\Request;
 use MDcabinet\Core\Response;
 use MDcabinet\Core\Str;
@@ -14,7 +17,7 @@ use MDcabinet\Models\Setting;
 use MDcabinet\Models\User;
 
 /**
- * Nastavenia inštancie – dostupné len správcovi.
+ * Instance settings – available to administrators only.
  */
 final class AdminController
 {
@@ -43,7 +46,7 @@ final class AdminController
 
             if ($code !== '' && mb_strlen($code, 'UTF-8') < 6) {
                 throw HttpException::validation(
-                    ['registrationCode' => 'Kód má mať aspoň 6 znakov, inak sa dá uhádnuť.']
+                    ['registrationCode' => Lang::t('The code should be at least 6 characters, otherwise it is guessable.')]
                 );
             }
 
@@ -53,7 +56,7 @@ final class AdminController
         return Response::json(['settings' => $this->payload()]);
     }
 
-    /** Vygeneruje návrh kódu; uloží sa až s formulárom. */
+    /** Suggests a code; it is only stored when the form is submitted. */
     public function suggestCode(Request $request): Response
     {
         $this->assertAdmin();
@@ -61,12 +64,44 @@ final class AdminController
         return Response::json(['code' => strtoupper(Str::token(12))]);
     }
 
+    /**
+     * Database updates. After uploading a new version over FTP there is often
+     * no SSH available to run bin/migrate.php, so an administrator can apply
+     * the pending migrations from here.
+     */
+    public function migrations(Request $request): Response
+    {
+        $this->assertAdmin();
+
+        return Response::json([
+            'pending' => Migrator::pending(),
+            'applied' => array_column(
+                Database::fetchAll('SELECT `migration`, `executed_at` FROM `migrations` ORDER BY `id` ASC'),
+                'migration'
+            ),
+        ]);
+    }
+
+    public function runMigrations(Request $request): Response
+    {
+        $this->assertAdmin();
+
+        $pending = Migrator::pending();
+        if ($pending === []) {
+            return Response::json(['ran' => [], 'pending' => []]);
+        }
+
+        $ran = Migrator::run();
+
+        return Response::json(['ran' => $ran, 'pending' => Migrator::pending()]);
+    }
+
     /** @return array<string,mixed> */
     private function payload(): array
     {
         return [
             'registrationOpen' => Setting::registrationOpen(),
-            // Kód vidí len správca – potrebuje ho vedieť poslať kolegom.
+            // Only an administrator sees the code – they need to pass it on.
             'registrationCode' => Setting::registrationCode(),
             'userCount'        => User::count(),
         ];
@@ -75,7 +110,7 @@ final class AdminController
     private function assertAdmin(): void
     {
         if (!Auth::isAdmin()) {
-            throw HttpException::forbidden('Toto nastavenie môže meniť len správca.');
+            throw HttpException::forbidden(Lang::t('Only an administrator can change this setting.'));
         }
     }
 }

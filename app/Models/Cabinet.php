@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MDcabinet\Models;
 
 use MDcabinet\Core\Database;
+use MDcabinet\Core\Lang;
 
 final class Cabinet extends Model
 {
@@ -36,7 +37,7 @@ final class Cabinet extends Model
     }
 
     /**
-     * Celý strom skrine: trays → folders → documents (bez obsahu dokumentov).
+     * The whole cabinet tree: trays → folders → documents (without content).
      *
      * @return array<string,mixed>
      */
@@ -66,14 +67,16 @@ final class Cabinet extends Model
         return $cabinet;
     }
 
-    /** Prvý cabinet používateľa – použije sa po registrácii ako "Môj priestor". */
+    /** The user's first cabinet, created right after registration. */
     public static function createDefault(int $userId): int
     {
+        $name = Lang::t('My space');
+
         return self::create([
             'owner_id'    => $userId,
-            'name'        => 'Môj priestor',
-            'slug'        => self::uniqueSlug('Môj priestor', ['owner_id' => $userId]),
-            'description' => 'Prvá skriňa – premenuj ju alebo si vytvor ďalšie.',
+            'name'        => $name,
+            'slug'        => self::uniqueSlug($name, ['owner_id' => $userId]),
+            'description' => Lang::t('Your first cabinet – rename it or create more.'),
             'color'       => '#6366f1',
             'position'    => 0,
         ]);

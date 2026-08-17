@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace MDcabinet\Core;
 
 /**
- * Obal nad superglobálmi. JSON body sa parsuje lazy pri prvom prístupe.
+ * Wrapper around the superglobals. The JSON body is parsed lazily on first use.
  */
 final class Request
 {
     /**
-     * Ako sa na tomto hostingu tvoria adresy:
-     *   pretty   – /api/files/12          (funguje mod_rewrite)
+     * How URLs are formed on this hosting:
+     *   pretty   – /api/files/12          (mod_rewrite works)
      *   pathinfo – /index.php/api/files/12
      *   query    – /index.php?_route=/api/files/12
      */
@@ -35,8 +35,8 @@ final class Request
     }
 
     /**
-     * Adresa API endpointu v tvare, ktorý na tomto hostingu funguje.
-     * Používa sa napr. pri vkladaní obrázkov do Markdownu.
+     * URL of an API endpoint in the form that works on this hosting.
+     * Used for example when inserting images into Markdown.
      */
     public static function apiUrl(string $path): string
     {
@@ -53,12 +53,13 @@ final class Request
     {
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
-        // Podpora pre _method override (formuláre, staré proxy).
+        // Support for a _method override (forms, legacy proxies).
         if ($method === 'POST' && isset($_POST['_method'])) {
             $method = strtoupper((string) $_POST['_method']);
         }
 
-        // Cesta môže doraziť tromi spôsobmi – podľa toho, čo hosting zvláda:
+        // The path can arrive in three shapes, depending on what the hosting
+        // supports:
         //   /api/setup/status                       mod_rewrite
         //   /index.php/api/setup/status             PATH_INFO
         //   /index.php?_route=/api/setup/status     query parameter
@@ -85,9 +86,9 @@ final class Request
         return new self($method, $path === '//' ? '/' : $path);
     }
 
-    // ------------------------------------------------------------- vstupy ---
+    // --------------------------------------------------------------- input ---
 
-    /** Hodnota z JSON body, POST alebo query stringu (v tomto poradí). */
+    /** A value from the JSON body, POST or the query string, in that order. */
     public function input(string $key, mixed $default = null): mixed
     {
         $json = $this->json();
@@ -170,7 +171,7 @@ final class Request
         return is_scalar($value) ? (string) $value : $default;
     }
 
-    // ------------------------------------------------------ route parametre ---
+    // ------------------------------------------------------ route parameters ---
 
     /** @param array<string,string> $params */
     public function setRouteParams(array $params): void
@@ -188,7 +189,7 @@ final class Request
         return (int) ($this->routeParams[$key] ?? 0);
     }
 
-    // ------------------------------------------------------------ hlavičky ---
+    // ------------------------------------------------------------- headers ---
 
     public function header(string $name): ?string
     {

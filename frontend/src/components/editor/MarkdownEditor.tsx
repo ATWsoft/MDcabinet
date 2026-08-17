@@ -11,7 +11,8 @@ import {
 
 import { api } from '@/lib/api'
 import { countWords } from '@/lib/markdown'
-import { cx, modKey, pluralize } from '@/lib/utils'
+import { cx, modKey } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 import { useTheme } from '@/state/theme'
 import { useToast } from '@/components/ui'
 import { MarkdownPreview } from '@/components/MarkdownPreview'
@@ -29,7 +30,7 @@ interface MarkdownEditorProps {
   documentId?: number
   saving?: boolean
   dirty?: boolean
-  /** Doplnkový obsah do pravej časti lišty (napr. stav uloženia). */
+  /** Extra content for the right side of the status bar. */
   status?: ReactNode
 }
 
@@ -40,6 +41,7 @@ export function MarkdownEditor({
   const previewRef = useRef<HTMLDivElement>(null)
   const syncingFrom = useRef<'editor' | 'preview' | null>(null)
 
+  const { t, tn, n } = useI18n()
   const { resolved } = useTheme()
   const toast = useToast()
 
@@ -52,7 +54,7 @@ export function MarkdownEditor({
 
   useEffect(() => localStorage.setItem('mdcabinet.viewMode', mode), [mode])
 
-  // Na úzkych displejoch nemá zmysel držať dva stĺpce vedľa seba.
+  // Two columns side by side make no sense on narrow screens.
   useEffect(() => {
     const media = window.matchMedia('(max-width: 900px)')
     const apply = () => {
@@ -69,7 +71,7 @@ export function MarkdownEditor({
     if (view) action(view)
   }, [])
 
-  /* ------------------------------------------------------------ uploady --- */
+  /* ------------------------------------------------------------- uploads --- */
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -83,17 +85,17 @@ export function MarkdownEditor({
           withView((view) =>
             uploaded.isImage
               ? insertImage(view, uploaded.url, uploaded.originalName)
-              : insertLink(view, uploaded.url),
+              : insertLink(view, uploaded.originalName, uploaded.url),
           )
         }
-        toast.success(list.length === 1 ? 'Súbor nahratý.' : `Nahraných ${list.length} súborov.`)
+        toast.success(tn(list.length, '{count} file uploaded.', '{count} files uploaded.'))
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Nahrávanie zlyhalo.')
+        toast.error(error instanceof Error ? error.message : t('The upload failed.'))
       } finally {
         setUploading(false)
       }
     },
-    [documentId, toast, withView],
+    [documentId, t, tn, toast, withView],
   )
 
   const pickFile = useCallback(() => {
@@ -105,7 +107,9 @@ export function MarkdownEditor({
     input.click()
   }, [uploadFiles])
 
-  /* --------------------------------------------------- klávesové skratky --- */
+  /* --------------------------------------------------- keyboard shortcuts --- */
+
+  const linkPlaceholder = t('link text')
 
   const extensions = useMemo(
     () => [
@@ -116,7 +120,7 @@ export function MarkdownEditor({
         { key: 'Mod-s', preventDefault: true, run: () => (onSave(), true) },
         { key: 'Mod-b', preventDefault: true, run: (view) => (wrapSelection(view, '**'), true) },
         { key: 'Mod-i', preventDefault: true, run: (view) => (wrapSelection(view, '*'), true) },
-        { key: 'Mod-k', preventDefault: true, run: (view) => (insertLink(view), true) },
+        { key: 'Mod-k', preventDefault: true, run: (view) => (insertLink(view, linkPlaceholder), true) },
         { key: 'Mod-e', preventDefault: true, run: (view) => (wrapSelection(view, '`'), true) },
       ]),
       EditorView.domEventHandlers({
@@ -136,10 +140,10 @@ export function MarkdownEditor({
         },
       }),
     ],
-    [onSave, uploadFiles],
+    [linkPlaceholder, onSave, uploadFiles],
   )
 
-  /* ------------------------------------------------------ synchro scroll --- */
+  /* ------------------------------------------------------- scroll syncing --- */
 
   const onEditorScroll = useCallback(() => {
     if (mode !== 'split' || syncingFrom.current === 'preview') return
@@ -164,7 +168,7 @@ export function MarkdownEditor({
 
   const words = useMemo(() => countWords(value), [value])
 
-  /* -------------------------------------------------------------- render --- */
+  /* --------------------------------------------------------------- render --- */
 
   const showEditor = mode !== 'preview'
   const showPreview = mode !== 'write'
@@ -208,7 +212,7 @@ export function MarkdownEditor({
                 highlightSelectionMatches: false,
                 searchKeymap: true,
               }}
-              placeholder="Píš v Markdowne… Obrázok vlož pretiahnutím alebo Ctrl+V."
+              placeholder={t('Write in Markdown… Drop an image in or paste it with {key}+V.', { key: modKey })}
             />
           </div>
         )}
@@ -230,24 +234,24 @@ export function MarkdownEditor({
 
       <div className="flex shrink-0 items-center justify-between gap-4 border-t border-ink-100 bg-ink-50/60 px-4 py-1.5 text-[12px] text-ink-500 dark:border-ink-800 dark:bg-ink-950/40 dark:text-ink-400">
         <div className="flex items-center gap-3">
-          <span>{pluralize(words, 'slovo', 'slová', 'slov')}</span>
+          <span>{tn(words, '{count} word', '{count} words', { count: words })}</span>
           <span className="hidden sm:inline">
-            {pluralize(value.length, 'znak', 'znaky', 'znakov')}
+            {t('{count} characters', { count: n(value.length) })}
           </span>
           <span className="hidden md:inline text-ink-400 dark:text-ink-500">
-            {modKey}+S uložiť · {modKey}+B tučné · {modKey}+K odkaz
+            {t('{key}+S save · {key}+B bold · {key}+K link', { key: modKey })}
           </span>
         </div>
         <div className="flex items-center gap-2">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {status ?? (dirty ? 'Neuložené zmeny' : 'Uložené')}
+          {status ?? (dirty ? t('Unsaved changes') : t('Saved'))}
         </div>
       </div>
     </div>
   )
 }
 
-/* ----------------------------------------------------------- Toolbar --- */
+/* ------------------------------------------------------------- Toolbar --- */
 
 function Toolbar({
   mode, onMode, zen, onZen, uploading, onUpload, onCommand,
@@ -260,32 +264,40 @@ function Toolbar({
   onUpload: () => void
   onCommand: (action: (view: EditorView) => void) => void
 }) {
+  const { t } = useI18n()
+
+  const tableLabels: [string, string, string] = [
+    t('Column A'),
+    t('Column B'),
+    t('value'),
+  ]
+
   const tools = [
-    { icon: Heading1, label: 'Nadpis 1', run: (v: EditorView) => setHeading(v, 1) },
-    { icon: Heading2, label: 'Nadpis 2', run: (v: EditorView) => setHeading(v, 2) },
-    { icon: Heading3, label: 'Nadpis 3', run: (v: EditorView) => setHeading(v, 3) },
-    { divider: true },
-    { icon: Bold, label: `Tučné (${modKey}+B)`, run: (v: EditorView) => wrapSelection(v, '**') },
-    { icon: Italic, label: `Kurzíva (${modKey}+I)`, run: (v: EditorView) => wrapSelection(v, '*') },
-    { icon: Code, label: `Kód (${modKey}+E)`, run: (v: EditorView) => wrapSelection(v, '`') },
-    { divider: true },
-    { icon: List, label: 'Odrážky', run: (v: EditorView) => toggleLinePrefix(v, '- ') },
-    { icon: ListOrdered, label: 'Číslovaný zoznam', run: (v: EditorView) => toggleLinePrefix(v, '', true) },
-    { icon: Quote, label: 'Citácia', run: (v: EditorView) => toggleLinePrefix(v, '> ') },
-    { divider: true },
-    { icon: Link2, label: `Odkaz (${modKey}+K)`, run: (v: EditorView) => insertLink(v) },
-    { icon: Table, label: 'Tabuľka', run: (v: EditorView) => insertTable(v) },
-    { icon: Code, label: 'Blok kódu', run: (v: EditorView) => insertCodeBlock(v), key: 'codeblock' },
-  ] as const
+    { id: 'h1', icon: Heading1, label: t('Heading 1'), run: (v: EditorView) => setHeading(v, 1) },
+    { id: 'h2', icon: Heading2, label: t('Heading 2'), run: (v: EditorView) => setHeading(v, 2) },
+    { id: 'h3', icon: Heading3, label: t('Heading 3'), run: (v: EditorView) => setHeading(v, 3) },
+    { id: 'd1', divider: true as const },
+    { id: 'bold', icon: Bold, label: `${t('Bold')} (${modKey}+B)`, run: (v: EditorView) => wrapSelection(v, '**') },
+    { id: 'italic', icon: Italic, label: `${t('Italic')} (${modKey}+I)`, run: (v: EditorView) => wrapSelection(v, '*') },
+    { id: 'code', icon: Code, label: `${t('Inline code')} (${modKey}+E)`, run: (v: EditorView) => wrapSelection(v, '`') },
+    { id: 'd2', divider: true as const },
+    { id: 'ul', icon: List, label: t('Bullet list'), run: (v: EditorView) => toggleLinePrefix(v, '- ') },
+    { id: 'ol', icon: ListOrdered, label: t('Numbered list'), run: (v: EditorView) => toggleLinePrefix(v, '', true) },
+    { id: 'quote', icon: Quote, label: t('Quote'), run: (v: EditorView) => toggleLinePrefix(v, '> ') },
+    { id: 'd3', divider: true as const },
+    { id: 'link', icon: Link2, label: `${t('Link')} (${modKey}+K)`, run: (v: EditorView) => insertLink(v, t('link text')) },
+    { id: 'table', icon: Table, label: t('Table'), run: (v: EditorView) => insertTable(v, tableLabels) },
+    { id: 'codeblock', icon: Code, label: t('Code block'), run: (v: EditorView) => insertCodeBlock(v) },
+  ]
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-ink-100 bg-white px-2 py-1.5 dark:border-ink-800 dark:bg-ink-900">
-      {tools.map((tool, index) =>
+      {tools.map((tool) =>
         'divider' in tool ? (
-          <span key={`d${index}`} className="mx-1 h-5 w-px bg-ink-200 dark:bg-ink-700" />
+          <span key={tool.id} className="mx-1 h-5 w-px bg-ink-200 dark:bg-ink-700" />
         ) : (
           <ToolButton
-            key={('key' in tool ? tool.key : '') + tool.label}
+            key={tool.id}
             label={tool.label}
             icon={<tool.icon className="h-4 w-4" />}
             onClick={() => onCommand(tool.run)}
@@ -295,7 +307,7 @@ function Toolbar({
 
       <span className="mx-1 h-5 w-px bg-ink-200 dark:bg-ink-700" />
       <ToolButton
-        label="Nahrať obrázok alebo prílohu"
+        label={t('Upload an image or attachment')}
         icon={uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
         onClick={onUpload}
       />
@@ -303,9 +315,9 @@ function Toolbar({
       <div className="ml-auto flex items-center gap-1">
         <div className="flex rounded-lg bg-ink-100 p-0.5 dark:bg-ink-800">
           {([
-            ['write', PenLine, 'Len editor'],
-            ['split', Columns2, 'Editor + náhľad'],
-            ['preview', Eye, 'Len náhľad'],
+            ['write', PenLine, t('Editor only')],
+            ['split', Columns2, t('Editor and preview')],
+            ['preview', Eye, t('Preview only')],
           ] as const).map(([value, Icon, label]) => (
             <button
               key={value}
@@ -326,7 +338,7 @@ function Toolbar({
         </div>
 
         <ToolButton
-          label={zen? 'Ukončiť režim na celú obrazovku' : 'Na celú obrazovku'}
+          label={zen ? t('Leave full screen') : t('Full screen')}
           icon={zen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           onClick={onZen}
         />

@@ -7,6 +7,7 @@ namespace MDcabinet\Http\Controllers;
 use MDcabinet\Core\Auth;
 use MDcabinet\Core\Database;
 use MDcabinet\Core\HttpException;
+use MDcabinet\Core\Lang;
 use MDcabinet\Core\Request;
 use MDcabinet\Core\Response;
 use MDcabinet\Core\Validator;
@@ -45,7 +46,7 @@ final class DocumentController
         if ($folderId !== null) {
             $folder = Access::folder($folderId);
             if ((int) $folder['tray_id'] !== (int) $tray['id']) {
-                throw HttpException::badRequest('Zložka patrí do iného šuplíka.');
+                throw HttpException::badRequest(Lang::t('The folder belongs to a different tray.'));
             }
         }
 
@@ -63,7 +64,7 @@ final class DocumentController
         return Response::json(['document' => Presenter::document(Document::find($id) ?? [])], 201);
     }
 
-    /** Uloženie obsahu z editora – vytvorí revíziu, ak sa niečo naozaj zmenilo. */
+    /** Saves content from the editor; a revision is added only on a real change. */
     public function update(Request $request): Response
     {
         $userId   = Auth::idOrFail();
@@ -100,7 +101,7 @@ final class DocumentController
         ]);
     }
 
-    /** Presun dokumentu do inej zložky / iného šuplíka. */
+    /** Moves a document into a different folder or tray. */
     public function move(Request $request): Response
     {
         $document = Access::document($request->paramInt('id'));
@@ -120,7 +121,7 @@ final class DocumentController
         if ($folderId !== null) {
             $folder = Access::folder($folderId);
             if ((int) $folder['tray_id'] !== (int) $tray['id']) {
-                throw HttpException::badRequest('Cieľová zložka nie je v cieľovom šuplíku.');
+                throw HttpException::badRequest(Lang::t('The target folder is not in the target tray.'));
             }
         }
 
@@ -163,7 +164,7 @@ final class DocumentController
         return Response::json(['ok' => true]);
     }
 
-    // ------------------------------------------------------------ revízie ---
+    // ----------------------------------------------------------- revisions ---
 
     public function revisions(Request $request): Response
     {
@@ -183,13 +184,13 @@ final class DocumentController
         $revision = Revision::findForDocument((int) $document['id'], $request->paramInt('revisionId'));
 
         if ($revision === null) {
-            throw HttpException::notFound('Revízia neexistuje.');
+            throw HttpException::notFound(Lang::t('The revision does not exist.'));
         }
 
         return Response::json(['revision' => Presenter::revision($revision)]);
     }
 
-    /** Vráti dokument do stavu revízie – ako novú revíziu, história zostáva. */
+    /** Restores a revision as a new revision, so the history is preserved. */
     public function revert(Request $request): Response
     {
         $userId   = Auth::idOrFail();
@@ -197,7 +198,7 @@ final class DocumentController
         $revision = Revision::findForDocument((int) $document['id'], $request->paramInt('revisionId'));
 
         if ($revision === null) {
-            throw HttpException::notFound('Revízia neexistuje.');
+            throw HttpException::notFound(Lang::t('The revision does not exist.'));
         }
 
         Document::update((int) $document['id'], [
@@ -214,7 +215,7 @@ final class DocumentController
             (string) $revision['title'],
             (string) $revision['content'],
             'revert',
-            'Návrat na revíziu #' . $revision['revision_no']
+            Lang::t('Reverted to revision #{number}', ['number' => (int) $revision['revision_no']])
         );
 
         return Response::json(['document' => Presenter::document(Document::find((int) $document['id']) ?? [])]);

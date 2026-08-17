@@ -1,8 +1,8 @@
 # ---------------------------------------------------------------------------
-#  Lokálny vývoj – simuluje klasický PHP hosting (Apache + mod_rewrite + MySQL)
-#  Spustenie:  docker compose up -d
-#  App:        http://localhost:8080
-#  Adminer:    http://localhost:8081   (server: db, user: mdcabinet, heslo: secret)
+#  Local development – mimics a classic PHP hosting (Apache + mod_rewrite + MySQL)
+#  Start with:  docker compose up -d
+#  App:         http://localhost:8080
+#  Adminer:     http://localhost:8081   (server: db, user: mdcabinet, password: secret)
 # ---------------------------------------------------------------------------
 services:
   app:

@@ -4,13 +4,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, FolderTree, Inbox, Pencil, Plus, Share2, Trash2 } from 'lucide-react'
 
 import { api } from '@/lib/api'
-import { timeAgo } from '@/lib/utils'
+import { cx, timeAgo } from '@/lib/utils'
+import { useI18n } from '@/state/locale'
 import {
   Button, ConfirmDialog, EmptyState, Input, Modal, PageLoader, Textarea, useToast,
 } from '@/components/ui'
 import { ShareDialog } from '@/components/ShareDialog'
 
+const PALETTE = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6']
+
 export function CabinetPage() {
+  const { t } = useI18n()
   const { id } = useParams()
   const cabinetId = Number(id)
   const navigate = useNavigate()
@@ -33,7 +37,7 @@ export function CabinetPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.info('Skriňa bola zmazaná.')
+      toast.info(t('The cabinet was deleted.'))
       navigate('/')
     },
     onError: (error: Error) => toast.error(error.message),
@@ -43,7 +47,10 @@ export function CabinetPage() {
   if (isError || !data) {
     return (
       <div className="p-8">
-        <EmptyState title="Skriňa sa nenašla" description="Možno bola zmazaná alebo patrí inému účtu." />
+        <EmptyState
+          title={t('Cabinet not found')}
+          description={t('It may have been deleted or it belongs to another account.')}
+        />
       </div>
     )
   }
@@ -75,23 +82,23 @@ export function CabinetPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Button icon={<Pencil className="h-4 w-4" />} onClick={() => setEditing(true)}>
-              Upraviť
+              {t('Edit')}
             </Button>
             <Button icon={<Share2 className="h-4 w-4" />} onClick={() => setSharing(true)}>
-              Zdieľať
+              {t('Share')}
             </Button>
             <Button
               variant="ghost"
               icon={<Trash2 className="h-4 w-4" />}
               onClick={() => setDeleting(true)}
-              aria-label="Zmazať skriňu"
+              aria-label={t('Delete cabinet')}
             />
             <Button
               variant="primary"
               icon={<Plus className="h-4 w-4" />}
               onClick={() => setCreatingTray(true)}
             >
-              Nový šuplík
+              {t('New tray')}
             </Button>
           </div>
         </header>
@@ -99,11 +106,11 @@ export function CabinetPage() {
         {trays.length === 0 ? (
           <EmptyState
             icon={<Inbox className="h-10 w-10" />}
-            title="Skriňa je prázdna"
-            description="Šuplík je ako kniha v BookStacku – zoskupuje zložky a dokumenty k jednej téme."
+            title={t('This cabinet is empty')}
+            description={t('A tray groups folders and documents around one topic.')}
             action={
               <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setCreatingTray(true)}>
-                Vytvoriť prvý šuplík
+                {t('Create the first tray')}
               </Button>
             }
           />
@@ -130,11 +137,11 @@ export function CabinetPage() {
                         </p>
                       )}
                       <div className="mt-2 flex items-center gap-3 text-[12px] text-ink-400">
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1" title={t('Folders')}>
                           <FolderTree className="h-3.5 w-3.5" />
                           {tray.folders?.length ?? 0}
                         </span>
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1" title={t('Documents')}>
                           <FileText className="h-3.5 w-3.5" />
                           {documents}
                         </span>
@@ -171,8 +178,8 @@ export function CabinetPage() {
 
       <ConfirmDialog
         open={deleting}
-        title="Zmazať skriňu?"
-        description={`„${cabinet.name}“ aj so všetkými šuplíkmi a dokumentmi.`}
+        title={t('Delete this cabinet?')}
+        description={t('“{name}” with all its trays and documents.', { name: cabinet.name })}
         onCancel={() => setDeleting(false)}
         onConfirm={() => remove.mutate()}
         loading={remove.isPending}
@@ -198,6 +205,7 @@ function TrayFormModal({
   onClose: () => void
   cabinetId: number
 }) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const queryClient = useQueryClient()
@@ -209,7 +217,7 @@ function TrayFormModal({
     onSuccess: async ({ tray }) => {
       await queryClient.invalidateQueries({ queryKey: ['cabinet', cabinetId] })
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
-      toast.success('Šuplík je vytvorený.')
+      toast.success(t('The tray was created.'))
       setName('')
       setDescription('')
       onClose()
@@ -222,32 +230,32 @@ function TrayFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Nový šuplík"
-      description="Šuplík zoskupuje zložky a dokumenty k jednej téme."
+      title={t('New tray')}
+      description={t('A tray groups folders and documents around one topic.')}
       footer={
         <>
-          <Button onClick={onClose}>Zrušiť</Button>
+          <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button
             variant="primary"
             loading={mutation.isPending}
             disabled={name.trim() === ''}
             onClick={() => mutation.mutate()}
           >
-            Vytvoriť
+            {t('Create')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input
-          label="Názov"
+          label={t('Name')}
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="napr. Procesy a smernice"
+          placeholder={t('e.g. Processes and policies')}
           autoFocus
         />
         <Textarea
-          label="Popis (voliteľné)"
+          label={t('Description (optional)')}
           rows={3}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
@@ -264,6 +272,7 @@ function CabinetEditModal({
   onClose: () => void
   cabinet: { id: number; name: string; description: string | null; color: string }
 }) {
+  const { t } = useI18n()
   const [name, setName] = useState(cabinet.name)
   const [description, setDescription] = useState(cabinet.description ?? '')
   const [color, setColor] = useState(cabinet.color)
@@ -276,49 +285,49 @@ function CabinetEditModal({
       await queryClient.invalidateQueries({ queryKey: ['cabinet', cabinet.id] })
       await queryClient.invalidateQueries({ queryKey: ['cabinets'] })
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('Zmeny sú uložené.')
+      toast.success(t('Changes saved.'))
       onClose()
     },
     onError: (error: Error) => toast.error(error.message),
   })
 
-  const palette = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6']
-
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Upraviť skriňu"
+      title={t('Edit cabinet')}
       footer={
         <>
-          <Button onClick={onClose}>Zrušiť</Button>
+          <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" loading={mutation.isPending} onClick={() => mutation.mutate()}>
-            Uložiť
+            {t('Save')}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input label="Názov" value={name} onChange={(event) => setName(event.target.value)} />
+        <Input label={t('Name')} value={name} onChange={(event) => setName(event.target.value)} />
         <Textarea
-          label="Popis"
+          label={t('Description')}
           rows={3}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
         <div>
-          <span className="mb-2 block text-sm font-medium text-ink-700 dark:text-ink-200">Farba</span>
+          <span className="mb-2 block text-sm font-medium text-ink-700 dark:text-ink-200">
+            {t('Colour')}
+          </span>
           <div className="flex flex-wrap gap-2">
-            {palette.map((value) => (
+            {PALETTE.map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setColor(value)}
-                aria-label={`Farba ${value}`}
-                className={
-                  'h-7 w-7 rounded-lg ring-offset-2 transition dark:ring-offset-ink-900 ' +
-                  (color === value ? 'ring-2 ring-ink-400' : 'hover:scale-110')
-                }
+                aria-label={t('Colour {value}', { value })}
+                className={cx(
+                  'h-7 w-7 rounded-lg ring-offset-2 transition dark:ring-offset-ink-900',
+                  color === value ? 'ring-2 ring-ink-400' : 'hover:scale-110',
+                )}
                 style={{ backgroundColor: value }}
               />
             ))}

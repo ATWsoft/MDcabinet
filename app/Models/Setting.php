@@ -8,17 +8,17 @@ use MDcabinet\Core\Config;
 use MDcabinet\Core\Database;
 
 /**
- * Nastavenia inštancie v tabuľke `settings` (kľúč/hodnota).
+ * Instance settings in the `settings` table (key/value).
  *
- * Zámerne v databáze a nie v config.php: správca ich má vedieť zmeniť
- * z aplikácie, bez lezenia na FTP.
+ * Deliberately in the database and not in config.php: an administrator
+ * should be able to change them from the app, without touching FTP.
  */
 final class Setting
 {
-    /** Je registrácia nových účtov vôbec povolená? */
+    /** Is registering new accounts allowed at all? */
     public const REGISTRATION_OPEN = 'registration_open';
 
-    /** Kód, ktorý musí uchádzač zadať. Prázdne = registrácia bez kódu. */
+    /** Code an applicant must supply. Empty = registration without a code. */
     public const REGISTRATION_CODE = 'registration_code';
 
     /** @var array<string,string>|null */
@@ -53,11 +53,11 @@ final class Setting
         self::set($key, $value ? '1' : '0');
     }
 
-    // ------------------------------------------------------ registrácia ---
+    // ------------------------------------------------------- registration ---
 
     /**
-     * Hodnoty z databázy majú prednosť; ak tam ešte nič nie je, použije sa
-     * predvoľba z config.php (čerstvá inštalácia).
+     * Database values win; when nothing is stored yet the default from
+     * config.php is used (fresh installation).
      */
     public static function registrationOpen(): bool
     {

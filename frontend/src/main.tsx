@@ -7,6 +7,7 @@ import { App } from './App'
 import { bootstrap, cachedApiMode, detectApiMode, setApiMode, usesPrettyUrls } from '@/lib/api'
 import { ToastProvider } from '@/components/ui'
 import { AuthProvider } from '@/state/auth'
+import { LocaleProvider } from '@/state/locale'
 import { ThemeProvider } from '@/state/theme'
 import './index.css'
 
@@ -15,7 +16,7 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: (failureCount, error) => {
-        // 401/403/404 nemá zmysel skúšať znova.
+        // 401/403/404 are not worth retrying.
         const status = (error as { status?: number }).status
         if (status && status >= 400 && status < 500) return false
 
@@ -27,11 +28,11 @@ const queryClient = new QueryClient({
 })
 
 const root = document.getElementById('root')
-if (!root) throw new Error('Chýba #root element.')
+if (!root) throw new Error('The #root element is missing.')
 
 function render(): void {
-  // Bez mod_rewrite by priame odkazy typu /documents/5 vracali 404 zo servera,
-  // preto sa v záložnom režime prepína na hash router.
+  // Without mod_rewrite, deep links such as /documents/5 would 404 on the
+  // server, so the fallback mode switches to a hash router.
   const Router = usesPrettyUrls() ? BrowserRouter : HashRouter
   const basename = usesPrettyUrls() ? bootstrap.basePath || undefined : undefined
 
@@ -39,13 +40,15 @@ function render(): void {
     <StrictMode>
       <Router basename={basename}>
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
-            <ToastProvider>
-              <AuthProvider>
-                <App />
-              </AuthProvider>
-            </ToastProvider>
-          </ThemeProvider>
+          <LocaleProvider>
+            <ThemeProvider>
+              <ToastProvider>
+                <AuthProvider>
+                  <App />
+                </AuthProvider>
+              </ToastProvider>
+            </ThemeProvider>
+          </LocaleProvider>
         </QueryClientProvider>
       </Router>
     </StrictMode>,
@@ -58,9 +61,10 @@ if (known) {
   setApiMode(known)
   render()
 } else {
-  // Optimisticky štartujeme s peknými adresami – to je prípad drvivej väčšiny
-  // hostingov. Detekcia beží popri tom; ak vyjde iný režim, appka sa raz
-  // načíta znova už so správnym nastavením. Funkčný hosting tak nezdržíme.
+  // Start optimistically with pretty URLs – that is the case on the vast
+  // majority of hostings. Detection runs alongside; if it finds a different
+  // mode the app reloads once with the right setting, so a healthy hosting
+  // is never held up.
   setApiMode('pretty')
   render()
 
